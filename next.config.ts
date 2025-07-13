@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  /* config options here */
-};
+// ✅ FILE: next.config.ts
 
-export default nextConfig;
+const nextConfig = {
+  output: 'export', // 👈 this is the key line for Netlify
+}
+
+export default nextConfig
+
