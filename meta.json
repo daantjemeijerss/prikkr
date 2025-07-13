@@ -1,0 +1,121 @@
+{
+  "ebe0c95f-81ef-41a4-982e-95ae399418ee": {
+    "range": {
+      "from": "2025-07-09",
+      "to": "2025-07-16"
+    },
+    "extendedHours": false
+  },
+  "ccfdcb5b-5dd1-48fa-b2f9-fdaad571a9d6": {
+    "range": {
+      "from": "2025-07-09",
+      "to": "2025-07-16"
+    },
+    "extendedHours": false
+  },
+  "b98f8c41-01b9-4ad5-8817-53002f0c935d": {
+    "range": {
+      "from": "2025-07-09",
+      "to": "2025-07-16"
+    },
+    "extendedHours": false
+  },
+  "2fabb8b4-12e4-4c57-978a-a3e7ca095fcb": {
+    "range": {
+      "from": "2025-07-09",
+      "to": "2025-07-16"
+    },
+    "extendedHours": false
+  },
+  "e611c2ab-418a-4aae-b01c-f2c050ad42e4": {
+    "range": {
+      "from": "2025-07-09",
+      "to": "2025-07-16"
+    },
+    "extendedHours": false
+  },
+  "301e98e0-4c67-45b8-b686-7d2578e21b8e": {
+    "range": {
+      "from": "2025-07-09",
+      "to": "2025-07-16"
+    },
+    "extendedHours": false
+  },
+  "dd1246e4-34c3-44dc-b50f-28fa9dd9cca8": {
+    "range": {
+      "from": "2025-07-09",
+      "to": "2025-07-16"
+    },
+    "extendedHours": false
+  },
+  "b0a47997-c9ca-477c-8c7d-c60b2193c1b2": {
+    "range": {
+      "from": "2025-07-10",
+      "to": "2025-07-17"
+    },
+    "extendedHours": false
+  },
+  "e17d383c-bf13-434f-8bee-caaad0e897f2": {
+    "range": {
+      "from": "2025-07-10",
+      "to": "2025-07-17"
+    },
+    "extendedHours": false
+  },
+  "efe14fa0-43db-42c6-850a-58df7d8be0fa": {
+    "range": {
+      "from": "2025-07-10",
+      "to": "2025-07-17"
+    },
+    "extendedHours": false
+  },
+  "2286c982-1794-4b30-988e-30b98f1ed458": {
+    "range": {
+      "from": "2025-07-10",
+      "to": "2025-07-17"
+    },
+    "extendedHours": false
+  },
+  "a9571f9d-b01d-4647-93b8-9bb51511bfc7": {
+    "range": {
+      "from": "2025-07-10",
+      "to": "2025-07-18"
+    },
+    "extendedHours": false
+  },
+  "6f61fea0-ca9e-4944-94ba-c44cbf7a073b": {
+    "range": {
+      "from": "2025-07-20",
+      "to": "2025-07-20"
+    },
+    "extendedHours": false
+  },
+  "6c6abad4-55ac-4c96-8dbc-3fe8603a479f": {
+    "range": {
+      "from": "2025-07-20",
+      "to": "2025-07-27"
+    },
+    "extendedHours": false
+  },
+  "c8ea754b-7393-4fa1-b217-188ccf9e3bc6": {
+    "range": {
+      "from": "2025-08-03",
+      "to": "2025-07-20"
+    },
+    "extendedHours": false
+  },
+  "90dcb7e1-2f2b-47eb-b224-bc0ec66e85e0": {
+    "range": {
+      "from": "2025-08-03",
+      "to": "2025-07-20"
+    },
+    "extendedHours": false
+  },
+  "3bb664db-3555-4305-af9f-f7e60fd41529": {
+    "range": {
+      "from": "2025-07-20",
+      "to": "2025-07-27"
+    },
+    "extendedHours": false
+  }
+}
