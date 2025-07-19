@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import redis from '../../../../lib/redis'; // Make sure this path is correct
+import redis from '@/lib/redis';
 
 async function sendResultsEmail(to: string, name: string, eventName: string, id: string) {
   const shareLink = `https://prikkr.com/rsvp/${id}/login`;
