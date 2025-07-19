@@ -49,17 +49,28 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { id, range, extendedHours, creatorEmail, creatorName, eventName } = body;
 
+    console.log('🆔 Received ID:', id);
+    console.log('📩 Email:', creatorEmail);
+    console.log('🌍 Running in environment:', process.env.NODE_ENV);
+
     if (!id || !range || typeof extendedHours !== 'boolean' || !creatorEmail || !eventName) {
+      console.warn('❌ Missing required fields');
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     const data = { range, extendedHours, creatorEmail, creatorName, eventName };
+        const redisKey = `meta:${id}`;
+    const redisValue = JSON.stringify(data);
 
-    console.log('📝 Saving to Redis:', data);
-    await redis.set(`meta:${id}`, JSON.stringify(data));
+    console.log('🔑 Redis Key:', redisKey);
+    console.log('📦 Redis Value:', redisValue);
+
+    const result = await redis.set(`meta:${id}`, JSON.stringify(data));
+    console.log('✅ Redis save result:', result);
 
     await sendResultsEmail(creatorEmail, creatorName, eventName, id);
 
+    console.log('📤 Returning success');
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('❌ Error saving metadata:', err);

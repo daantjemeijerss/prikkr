@@ -27,65 +27,75 @@ export default function CreatePage() {
     }
   }, [session]);
 
-  const handleSubmit = async () => {
-    if (!eventName || !creatorName || !creatorEmail || !from || !to) {
-      setError('Please fill in all fields before generating the link.');
-      return;
+const handleSubmit = async () => {
+  if (!eventName || !creatorName || !creatorEmail || !from || !to) {
+    setError('Please fill in all fields before generating the link.');
+    return;
+  }
+
+  setError('');
+  setIsSubmitting(true);
+
+  try {
+    const id = uuidv4();
+
+    const prikkrData = {
+      id,
+      range: { from, to },
+      extendedHours,
+      creatorEmail,
+      creatorName,
+      eventName,
+    };
+
+    console.log('🚀 Sending to /api/save-meta:', prikkrData);
+
+    const metaRes = await fetch('/api/save-meta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(prikkrData),
+    });
+
+    const metaResult = await metaRes.json();
+    console.log('📬 Response from /api/save-meta:', metaResult);
+
+    if (!metaRes.ok) {
+      throw new Error('Failed to save meta: ' + (metaResult?.error || 'Unknown error'));
     }
 
-    setError('');
-    setIsSubmitting(true);
+    localStorage.setItem(`creatorEmail-${id}`, creatorEmail);
 
-    try {
-      const id = uuidv4();
+    const defaultSelections: Record<string, string[]> = {};
+    const currentDate = new Date(from);
+    const endDate = new Date(to);
+    while (currentDate <= endDate) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      const slots = extendedHours
+        ? ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00']
+        : ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
+      defaultSelections[dateStr] = slots;
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
 
-      const prikkrData = {
+    await fetch('/api/save-response', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         id,
-        range: { from, to },
-        extendedHours,
-        creatorEmail,
-        creatorName,
-        eventName,
-      };
+        name: creatorName,
+        email: creatorEmail,
+        selections: defaultSelections,
+      }),
+    });
 
-      await fetch('/api/save-meta', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(prikkrData),
-      });
+    router.push(`/s/${id}`);
+  } catch (err) {
+    console.error('❌ Submission error:', err);
+    setError('Something went wrong. Please try again.');
+    setIsSubmitting(false);
+  }
+};
 
-      localStorage.setItem(`creatorEmail-${id}`, creatorEmail);
-
-      const defaultSelections: Record<string, string[]> = {};
-      const currentDate = new Date(from);
-      const endDate = new Date(to);
-      while (currentDate <= endDate) {
-        const dateStr = currentDate.toISOString().split('T')[0];
-        const slots = extendedHours
-          ? ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00']
-          : ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
-        defaultSelections[dateStr] = slots;
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-
-      await fetch('/api/save-response', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id,
-          name: creatorName,
-          email: creatorEmail,
-          selections: defaultSelections,
-        }),
-      });
-
-      router.push(`/s/${id}`);
-    } catch (err) {
-      console.error('Submission error:', err);
-      setError('Something went wrong. Please try again.');
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <main className="relative flex flex-col min-h-screen bg-white text-gray-900">
