@@ -117,5 +117,834 @@
       "to": "2025-07-27"
     },
     "extendedHours": false
+  },
+  "432ef626-c912-4317-800c-22afc93382b5": {
+    "range": {
+      "from": "2025-07-13",
+      "to": "2025-07-20"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "xa, lxa,"
+  },
+  "7a6d9f94-fb8c-447a-ac41-437dc8a05831": {
+    "range": {
+      "from": "2025-07-14",
+      "to": "2025-08-04"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "Test100"
+  },
+  "0e9903dd-2e3f-4084-9ff7-aa635da2400a": {
+    "range": {
+      "from": "2025-07-14",
+      "to": "2025-07-28"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "Test"
+  },
+  "7e06b282-8810-48e7-83ca-741fad91bda0": {
+    "range": {
+      "from": "2025-07-14",
+      "to": "2025-07-28"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "test"
+  },
+  "a23af72b-135d-4c02-b95c-dd281ba7f862": {
+    "range": {
+      "from": "2025-07-14",
+      "to": "2025-07-21"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "test"
+  },
+  "ab66c9ab-248f-4003-aeaf-a3db8ba81746": {
+    "range": {
+      "from": "2025-07-14",
+      "to": "2025-07-21"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "test"
+  },
+  "6a07e173-0723-49d6-9958-e900c864feaf": {
+    "range": {
+      "from": "2025-07-14",
+      "to": "2025-07-21"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "test"
+  },
+  "5059ef71-305d-43d3-8f6d-8aba79f927ea": {
+    "range": {
+      "from": "2025-07-14",
+      "to": "2025-07-21"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "fwefwe"
+  },
+  "818e133f-b81c-4c74-9d1d-8869313e028d": {
+    "range": {
+      "from": "2025-07-14",
+      "to": "2025-07-21"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "test"
+  },
+  "7f2e8ca2-651d-44a5-80c1-f7c8bb22e0e4": {
+    "range": {
+      "from": "2025-07-14",
+      "to": "2025-07-21"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "test"
+  },
+  "06489da5-f43c-4321-8bf5-7f3172d544e1": {
+    "range": {
+      "from": "2025-07-28",
+      "to": "2025-08-04"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "dwlmwelc"
+  },
+  "0f1118e3-37d6-4e96-b8e0-56ddbb91bb08": {
+    "range": {
+      "from": "2025-07-21",
+      "to": "2025-08-04"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "test"
+  },
+  "de02ee20-64c1-412a-b698-05663d6de0cb": {
+    "range": {
+      "from": "2025-07-28",
+      "to": "2025-07-28"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "efwwe"
+  },
+  "b9688f3d-1636-4b9e-8aca-01db2d0b0674": {
+    "range": {
+      "from": "2025-07-21",
+      "to": "2025-07-28"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "fefe"
+  },
+  "526a814a-469f-426b-a184-b30d9e3e794e": {
+    "range": {
+      "from": "2025-07-21",
+      "to": "2025-08-04"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "dqkdqk"
+  },
+  "af75d863-9529-48d0-a3db-a6ee44066a6d": {
+    "range": {
+      "from": "2025-07-14",
+      "to": "2025-08-04"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "qXQQ"
+  },
+  "f303c988-e7a0-4c51-bd93-0ed19e2badae": {
+    "range": {
+      "from": "2025-07-14",
+      "to": "2025-08-04"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "qXQQ"
+  },
+  "9a09f7e0-18f7-4bd6-a9ae-2c4a867a0efd": {
+    "range": {
+      "from": "2025-07-28",
+      "to": "2025-08-04"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "fwqfqw"
+  },
+  "c24e0ebc-f7d4-4965-89ec-d03564ec9589": {
+    "range": {
+      "from": "2025-07-28",
+      "to": "2025-08-04"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "fwqfqw"
+  },
+  "b5ae972b-0e2a-49ce-a833-16752abec7c6": {
+    "range": {
+      "from": "2025-07-14",
+      "to": "2025-08-04"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "wqcwqwq"
+  },
+  "5bf4ef37-5e20-4066-8e66-32bff314c1d2": {
+    "range": {
+      "from": "2025-07-14",
+      "to": "2025-08-04"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "qxwqcw1"
+  },
+  "1474cc5f-8722-4323-9c58-9d9b265f2725": {
+    "range": {
+      "from": "2025-07-14",
+      "to": "2025-08-04"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "ewce22e"
+  },
+  "dacd22e4-7c42-412b-8de2-91d6b42b5269": {
+    "range": {
+      "from": "2025-07-28",
+      "to": "2025-08-04"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "vweve23f2"
+  },
+  "3b0470ee-b10d-4abd-aca4-b5263dae940e": {
+    "range": {
+      "from": "2025-07-28",
+      "to": "2025-08-04"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "fwe23"
+  },
+  "2c68f47e-48f2-4275-a5a3-a71d90c894cd": {
+    "range": {
+      "from": "2025-07-28",
+      "to": "2025-08-04"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "dvswcw"
+  },
+  "ca1b8601-ecec-4ba1-bc5a-2d9b537b7e28": {
+    "range": {
+      "from": "2025-07-28",
+      "to": "2025-08-04"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "dvswcw"
+  },
+  "f92d9043-fbc2-4ddd-b8c1-c071308a035d": {
+    "range": {
+      "from": "2025-07-28",
+      "to": "2025-08-04"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "dvswcw"
+  },
+  "07b3f5e9-1409-409f-ab1b-e8fe044e4cd3": {
+    "range": {
+      "from": "2025-07-28",
+      "to": "2025-08-04"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "cqwcw"
+  },
+  "10db4241-2e5d-45ee-8489-88d2c10ba7c2": {
+    "range": {
+      "from": "2025-07-28",
+      "to": "2025-08-04"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "cqwcw"
+  },
+  "0004d39d-a5de-4e1c-979d-fdc265760898": {
+    "range": {
+      "from": "2025-07-21",
+      "to": "2025-08-04"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "dkmqsomxsql"
+  },
+  "4f108d73-20f3-4c17-bcff-2fdd52fd77d3": {
+    "range": {
+      "from": "2025-07-22",
+      "to": "2025-08-05"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "test"
+  },
+  "bc25966c-c636-44aa-a6fe-8ba8322dc1e1": {
+    "range": {
+      "from": "2025-07-22",
+      "to": "2025-08-05"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "test"
+  },
+  "5ba54080-69c0-4921-be85-c5134c996afa": {
+    "range": {
+      "from": "2025-07-22",
+      "to": "2025-08-05"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "test"
+  },
+  "4f7cef33-f211-4d1a-99cf-b151a3caf2bd": {
+    "range": {
+      "from": "2025-07-22",
+      "to": "2025-08-05"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "fqwwq"
+  },
+  "88150fef-ace8-49e7-9ace-cb7ace3313d2": {
+    "range": {
+      "from": "2025-07-29",
+      "to": "2025-08-05"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "daantje"
+  },
+  "7ec1292a-5560-4707-81e2-712475aa3e5b": {
+    "range": {
+      "from": "2025-07-15",
+      "to": "2025-08-05"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "wef3e"
+  },
+  "e8a930f5-40cd-4d91-b160-93c2e83da97f": {
+    "range": {
+      "from": "2025-07-15",
+      "to": "2025-08-05"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "f4323f"
+  },
+  "b821b767-2eb3-4b04-908e-2fcb45c6d26b": {
+    "range": {
+      "from": "2025-07-15",
+      "to": "2025-08-05"
+    },
+    "extendedHours": true,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "fwg3fw"
+  },
+  "3546676f-0b87-47b0-be17-935f5456b8e4": {
+    "range": {
+      "from": "2025-07-15",
+      "to": "2025-07-29"
+    },
+    "extendedHours": false,
+    "creatorEmail": "f232",
+    "eventName": "dw1r"
+  },
+  "5a88f2cd-26ab-4232-97b5-55a52eea84f7": {
+    "range": {
+      "from": "2025-07-16",
+      "to": "2025-08-06"
+    },
+    "extendedHours": false,
+    "creatorEmail": "drdrdtrd",
+    "eventName": "rstdsst"
+  },
+  "eec98e7b-7e85-4f40-b647-742253af9d37": {
+    "range": {
+      "from": "2025-07-16",
+      "to": "2025-08-06"
+    },
+    "extendedHours": false,
+    "creatorEmail": "cqcwq",
+    "eventName": "wcwqqw"
+  },
+  "e5ea79cf-1d7e-42f8-a945-1e3f70e1d3f8": {
+    "range": {
+      "from": "2025-07-16",
+      "to": "2025-07-30"
+    },
+    "extendedHours": true,
+    "creatorEmail": "fw2wf2w",
+    "eventName": "we2e"
+  },
+  "72d33a4b-f738-441b-a47a-16dfa3e37f6f": {
+    "range": {
+      "from": "2025-07-16",
+      "to": "2025-07-30"
+    },
+    "extendedHours": false,
+    "creatorEmail": "dq2wxw",
+    "eventName": "fqwdw2"
+  },
+  "3cc32155-3f1f-4f65-a7e1-01331fc1918c": {
+    "range": {
+      "from": "2025-07-16",
+      "to": "2025-07-30"
+    },
+    "extendedHours": true,
+    "creatorEmail": "dfqwdw1",
+    "eventName": "fwqfw2d"
+  },
+  "0022e987-2446-4a13-b038-36af559792bb": {
+    "range": {
+      "from": "2025-07-16",
+      "to": "2025-07-30"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "finsih"
+  },
+  "230540f4-63b5-4902-9889-614d9179c5fb": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-08-07"
+    },
+    "extendedHours": false,
+    "creatorEmail": "dqwwd",
+    "eventName": "fwqfw"
+  },
+  "61b4cc5c-1e80-41e8-87aa-ca41002bd7c1": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-08-07"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "eventName": "wqomqw"
+  },
+  "f98cf0ec-11cf-42ef-8586-dc0367b53523": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-08-07"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "eventName": "wqomqw"
+  },
+  "64f7890a-58d9-44ab-bc9e-658fcbb0d733": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-07-31"
+    },
+    "extendedHours": false,
+    "creatorEmail": "cqwqw",
+    "eventName": "wqcq"
+  },
+  "0a523f11-c59d-43e6-b03d-a724ea322c6b": {
+    "range": {
+      "from": "2025-07-31",
+      "to": "2025-08-07"
+    },
+    "extendedHours": false,
+    "creatorEmail": "cqq",
+    "eventName": "cacq"
+  },
+  "d11b77be-715c-436b-a51e-dde2efd89007": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-07-31"
+    },
+    "extendedHours": false,
+    "creatorEmail": "cqwq",
+    "eventName": "xaw"
+  },
+  "c3d0a87e-02a4-4a45-b14b-aeffa9ee07d1": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-07-31"
+    },
+    "extendedHours": false,
+    "creatorEmail": "csacqw",
+    "eventName": "casqw"
+  },
+  "46fb247c-069b-49b3-811c-e1a6d2104ba5": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-07-24"
+    },
+    "extendedHours": false,
+    "creatorEmail": "maaaaa",
+    "eventName": "peoplul"
+  },
+  "641e4c46-de6e-4fad-8835-e0649883dd54": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-07-31"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "eventName": "mmmmmhhhh"
+  },
+  "a03dc60b-ee53-43b4-bb8a-7748187af673": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-07-24"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner.com",
+    "eventName": "dqwqdw"
+  },
+  "6364075c-c598-49a5-b210-8ec63b69ea76": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-07-31"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "daantje",
+    "eventName": "bruhh"
+  },
+  "7cdea876-6c85-460f-a277-96c719b8425d": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-07-24"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "daada",
+    "eventName": "poep"
+  },
+  "fac0ca5b-71eb-4837-817e-1e006a6a978f": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-07-24"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "daada",
+    "eventName": "poep"
+  },
+  "e732b0e6-6311-416f-b2b3-535f70bf5df5": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-07-31"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "daan",
+    "eventName": "bububu"
+  },
+  "90c11f58-6108-4b9e-abe1-7f19456d4b4a": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-07-31"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "daan",
+    "eventName": "bububu"
+  },
+  "30a38af3-160c-4154-917a-3ec9e0814e46": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-07-31"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "daan",
+    "eventName": "bububu"
+  },
+  "ac72d132-f677-4ec9-a9de-e360ce25744f": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-07-31"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "daan",
+    "eventName": "bububu"
+  },
+  "8966cfaa-4aa0-4748-931f-ed90d61dd026": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-07-24"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "dqwdw",
+    "eventName": "dqwdw"
+  },
+  "a9b66cc8-22e9-4e13-9faa-1ce365333c41": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-07-31"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "creatorName": "daa",
+    "eventName": "pop"
+  },
+  "036a4c2d-d2e9-4b20-837b-c06db6273b5e": {
+    "range": {
+      "from": "2025-07-24",
+      "to": "2025-08-07"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "creatorName": "fwf22",
+    "eventName": "fw2ef2"
+  },
+  "5caa91b8-1956-429f-9a79-21d5a040bc0a": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-07-24"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "creatorName": "daan",
+    "eventName": "bruhhhhhaaaaa"
+  },
+  "60ec5a98-a85f-4b67-952d-5df9639c557a": {
+    "range": {
+      "from": "2025-07-17",
+      "to": "2025-07-31"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "mmmmmmm",
+    "eventName": "cax"
+  },
+  "1fc05e66-e767-49ad-a05a-e71b76debaec": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-08-01"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "creatorName": "daaa",
+    "eventName": "peop",
+    "finalSelection": {
+      "date": "2025-07-18",
+      "time": "09:00"
+    }
+  },
+  "aa800e89-4451-4eed-9129-655689a7a35b": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-07-25"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "creatorName": "boooooo",
+    "eventName": "kutzooi"
+  },
+  "15438ef4-bee4-4eef-a264-3c2f681b3946": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-07-25"
+    },
+    "extendedHours": false,
+    "creatorEmail": "daantjemeijerss@gmail.com",
+    "creatorName": "boooooo",
+    "eventName": "kutzooi",
+    "finalSelection": {
+      "date": "2025-07-18",
+      "time": "10:00"
+    }
+  },
+  "fc9fb6e3-1f24-4bca-92d4-d08cc1d0a596": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-07-25"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "peophoofd",
+    "eventName": "finaltesttttttt",
+    "finalSelection": {
+      "date": "2025-07-18",
+      "time": "09:00"
+    }
+  },
+  "20c32d18-9ff3-4e95-bc88-aac143a0bfff": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-07-25"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "bruh",
+    "eventName": "poep",
+    "finalSelection": {
+      "date": "2025-07-18",
+      "time": "09:00"
+    }
+  },
+  "92800349-4820-4641-be46-46308f364aa3": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-08-01"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "dwdw2ws2",
+    "eventName": "daaaaaaaaa",
+    "finalSelection": {
+      "date": "2025-07-18",
+      "time": "09:00"
+    }
+  },
+  "352116ec-9716-4c50-8350-ac64f2d6ad3d": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-07-25"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "poep",
+    "eventName": "confirm"
+  },
+  "354bfdb8-e234-4686-a307-84053b83174d": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-07-25"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "mmmemmeeeeeewee",
+    "eventName": "check"
+  },
+  "9c3bf683-d9d7-44ac-93ca-c7322e3eb721": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-08-01"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "dada",
+    "eventName": "hhhhhhmmmmmmmmm",
+    "finalSelection": {
+      "date": "2025-07-18",
+      "time": "10:00"
+    }
+  },
+  "294221ba-2a3c-4be0-bd64-f581fc325082": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-07-25"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "huppelkut",
+    "eventName": "pietlul"
+  },
+  "342dae0d-d4f2-4534-888a-606f6b2cab3f": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-07-26"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "Daantje Meijers",
+    "eventName": "peoplulllo"
+  },
+  "fa201934-6926-485f-a718-5d36c88631dc": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-08-01"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "Daantje Meijers",
+    "eventName": "oetlul",
+    "finalSelection": {
+      "date": "2025-07-18",
+      "time": "09:00"
+    }
+  },
+  "969c08c7-34cd-4285-a09b-89add65e0fba": {
+    "range": {
+      "from": "2025-07-18",
+      "to": "2025-07-25"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "Daantje Meijers",
+    "eventName": "final",
+    "finalSelection": {
+      "date": "2025-07-18",
+      "time": "10:00"
+    }
+  },
+  "491eddeb-fb65-4bea-aa46-8b437f6a20b5": {
+    "range": {
+      "from": "2025-07-19",
+      "to": "2025-08-02"
+    },
+    "extendedHours": false,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "tanja",
+    "eventName": "feestje",
+    "finalSelection": {
+      "date": "2025-07-20",
+      "time": "11:00"
+    }
+  },
+  "8919a06c-4443-4eb7-9006-b5a3131b63b9": {
+    "range": {
+      "from": "2025-07-19",
+      "to": "2025-07-26"
+    },
+    "extendedHours": true,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "dddddd",
+    "eventName": "xq"
+  },
+  "24480d39-a9c9-4bd1-95b4-b18f5be1dc63": {
+    "range": {
+      "from": "2025-07-19",
+      "to": "2025-07-26"
+    },
+    "extendedHours": true,
+    "creatorEmail": "prikkr.groupplanner@gmail.com",
+    "creatorName": "Daantje Meijers",
+    "eventName": "cwqq",
+    "finalSelection": {
+      "date": "2025-07-20",
+      "time": "20:00"
+    }
+  },
+  "5cccd4b3-a10b-4d5f-97e7-4e2f3c44d8bd": {
+    "range": {
+      "from": "2025-07-19",
+      "to": "2025-07-26"
+    },
+    "extendedHours": true,
+    "creatorEmail": "prikkr.goupplanner@gmail.com",
+    "creatorName": "cdaaaa",
+    "eventName": "poep",
+    "finalSelection": {
+      "date": "2025-07-19",
+      "time": "20:00"
+    }
   }
 }

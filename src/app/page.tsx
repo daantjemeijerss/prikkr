@@ -14,17 +14,16 @@ export default function Home() {
         src="/images/prikkr_logo_transparent.png"
         alt="Prikkr logo"
         onClick={() => router.push('/')}
-        className="absolute top-0 left-4 h-48 w-auto cursor-pointer z-10"
+        className="absolute top-2 left-2 h-20 w-auto sm:h-24 md:h-32 lg:h-48 cursor-pointer z-10"
       />
 
-
       {/* Hero Section */}
-      <section className="flex flex-col items-center justify-center text-center px-4 pt-32 pb-16 bg-red-50">
-        <h1 className="text-5xl font-bold text-gray-900 mb-6">
+      <section className="flex flex-col items-center justify-center text-center px-4 pt-28 pb-14 sm:pt-36 sm:pb-20 bg-red-50">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6">
           Welcome, are you ready to plan?
         </h1>
 
-        <p className="text-lg text-gray-600 mb-10 max-w-xl">
+        <p className="text-base sm:text-lg text-gray-600 mb-8 sm:mb-10 max-w-lg sm:max-w-xl">
           Prikkr helps you find the best time for your next meeting or event.
         </p>
 
@@ -32,12 +31,11 @@ export default function Home() {
           <p>Loading...</p>
         ) : session ? (
           <div className="flex flex-col items-center space-y-3">
-            <p className="text-lg font-medium">Welcome, {session.user?.name}</p>
-            <p className="text-sm text-gray-600">{session.user?.email}</p>
+            <p className="text-base sm:text-lg font-medium">Welcome, {session.user?.name}</p>
 
             <button
               onClick={() => router.push('/create')}
-              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow transition hover:scale-105"
+              className="px-5 py-3 text-base sm:text-lg font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 bg-green-600 text-white hover:bg-green-700 border border-green-500 shadow-[0_8px_20px_rgba(0,0,0,0.25)]"
             >
               Start Planning
             </button>
@@ -50,10 +48,10 @@ export default function Home() {
             </button>
           </div>
         ) : (
-          <div className="flex flex-col items-center space-y-4 mb-16">
+          <div className="flex flex-col items-center space-y-4 mb-10 sm:mb-16">
             <button
               onClick={() => signIn('google')}
-              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow transition hover:scale-105"
+              className="px-5 py-3 text-base sm:text-lg font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 bg-green-600 text-white hover:bg-green-700 border border-green-500 shadow-[0_8px_20px_rgba(0,0,0,0.25)]"
             >
               Sync with Google Calendar
             </button>
@@ -62,33 +60,33 @@ export default function Home() {
                 localStorage.setItem('skippedLogin', 'true')
                 router.push('/create')
               }}
-              className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-3 rounded-lg shadow transition hover:scale-105"
-            >
-              Choose Dates Manually
+              className="px-5 py-3 text-base sm:text-lg font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 bg-gray-200 text-gray-800 hover:bg-gray-300 border border-gray-200 shadow-[0_8px_20px_rgba(0,0,0,0.25)]"
+            > 
+              Don't sync with calendar
             </button>
           </div>
         )}
       </section>
 
       {/* How it works section */}
-      <section className="w-full py-16 px-6 bg-white border-t border-gray-200">
+      <section className="w-full py-14 px-4 sm:px-6 bg-white border-t border-gray-200">
         <div className="max-w-5xl mx-auto text-center">
-          <h2 className="text-3xl font-semibold mb-10">How it works</h2>
+          <h2 className="text-2xl sm:text-3xl font-semibold mb-8 sm:mb-10">How it works</h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
             <div className="flex flex-col items-center">
-              <div className="text-4xl mb-2">📅</div>
-              <h3 className="font-bold text-lg mb-1">1. Choose your date range</h3>
+              <div className="text-3xl sm:text-4xl mb-2">📅</div>
+              <h3 className="font-bold text-base sm:text-lg mb-1">1. Choose your date range</h3>
               <p className="text-sm text-gray-600">Pick the days you'd like to meet.</p>
             </div>
             <div className="flex flex-col items-center">
-              <div className="text-4xl mb-2">🔄</div>
-              <h3 className="font-bold text-lg mb-1">2. Sync your calendar</h3>
+              <div className="text-3xl sm:text-4xl mb-2">🔄</div>
+              <h3 className="font-bold text-base sm:text-lg mb-1">2. Sync your calendar</h3>
               <p className="text-sm text-gray-600">Or enter availability manually.</p>
             </div>
             <div className="flex flex-col items-center">
-              <div className="text-4xl mb-2">✅</div>
-              <h3 className="font-bold text-lg mb-1">3. Get the best date</h3>
+              <div className="text-3xl sm:text-4xl mb-2">✅</div>
+              <h3 className="font-bold text-base sm:text-lg mb-1">3. Get the best date</h3>
               <p className="text-sm text-gray-600">We show the most popular time slot.</p>
             </div>
           </div>
@@ -97,8 +95,8 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="w-full bg-gray-100 py-6 px-4 text-center text-sm text-gray-600">
-        <div className="mb-1 font-semibold text-gray-800">Prikkr</div>
-        <div className="mb-3 italic text-gray-600">"The smart way to plan together."</div>
+        <div className="mb-1 font-semibold text-gray-800 text-base">📌Prikkr</div>
+        <div className="mb-3 italic text-gray-600 text-sm">"The smart way to plan together."</div>
         <div className="mb-2">Office: Utrecht, Netherlands</div>
         <button
           onClick={() => router.push('/contact')}
@@ -106,7 +104,9 @@ export default function Home() {
         >
           Contact
         </button>
-        <div className="mt-4 text-xs text-gray-400">&copy; {new Date().getFullYear()} Prikkr. All rights reserved.</div>
+        <div className="mt-4 text-xs text-gray-400">
+          &copy; {new Date().getFullYear()} Prikkr. All rights reserved.
+        </div>
       </footer>
     </main>
   )

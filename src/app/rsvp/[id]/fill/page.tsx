@@ -9,14 +9,6 @@ interface TimeSlot {
   end: string;
 }
 
-function generateTimeSlots(start = 9, end = 17): string[] {
-  const slots: string[] = [];
-  for (let hour = start; hour < end; hour++) {
-    slots.push(`${hour.toString().padStart(2, '0')}:00`);
-  }
-  return slots;
-}
-
 function getDateRange(from: string, to: string): string[] {
   const dates = [];
   const current = new Date(from);
@@ -26,6 +18,20 @@ function getDateRange(from: string, to: string): string[] {
     current.setDate(current.getDate() + 1);
   }
   return dates;
+}
+
+function getWeekday(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { weekday: 'long' });
+}
+
+function formatDisplayDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 function isSlotBusy(slotTime: string, date: string, busySlots: TimeSlot[]): boolean {
@@ -46,52 +52,53 @@ export default function RSVPFillPage() {
   const [extendedHours, setExtendedHours] = useState(false);
   const [busySlots, setBusySlots] = useState<TimeSlot[]>([]);
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [customMode, setCustomMode] = useState(false);
   const [manualSelections, setManualSelections] = useState<Record<string, Set<string>>>({});
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     const id = params?.id;
     if (!id || typeof id !== 'string') return;
 
     const storedName = localStorage.getItem(`prikkr-name-${id}`);
+    const storedEmail = localStorage.getItem(`prikkr-email-${id}`);
     if (storedName) setName(storedName);
+    if (storedEmail) setEmail(storedEmail);
 
-    const fetchMeta = async () => {
-      const res = await fetch(`/api/get-meta?id=${id}`);
-      if (!res.ok) return;
-      const { range, extendedHours } = await res.json();
-      setRange(range);
-      setExtendedHours(extendedHours);
-    };
-    fetchMeta();
+    fetch(`/api/get-meta?id=${id}`)
+      .then(res => res.json())
+      .then(({ range, extendedHours }) => {
+        setRange(range);
+        setExtendedHours(extendedHours);
+      });
   }, [params]);
 
   useEffect(() => {
-    const fetchBusySlots = async () => {
-      if (!range || !session?.accessToken) return;
+    if (!range || !session?.accessToken) return;
 
-      const res = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          timeMin: `${range.from}T00:00:00.000Z`,
-          timeMax: `${range.to}T23:59:59.999Z`,
-          items: [{ id: 'primary' }],
-        }),
+    fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        timeMin: `${range.from}T00:00:00.000Z`,
+        timeMax: `${range.to}T23:59:59.999Z`,
+        items: [{ id: 'primary' }],
+      }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        setBusySlots(data.calendars?.primary?.busy || []);
       });
-
-      const data = await res.json();
-      const busy = data.calendars?.primary?.busy || [];
-      setBusySlots(busy);
-    };
-
-    fetchBusySlots();
   }, [range, session]);
 
-  const fullSlots = extendedHours ? generateTimeSlots(9, 22) : generateTimeSlots(9, 17);
+  const fullSlots = Array.from({ length: (extendedHours ? 23 : 17) - 9 }, (_, i) =>
+    `${String(9 + i).padStart(2, '0')}:00`
+  );
+
   const dates = range ? getDateRange(range.from, range.to) : [];
 
   const handleSlotToggle = (date: string, time: string) => {
@@ -113,8 +120,9 @@ export default function RSVPFillPage() {
   };
 
   const handleSubmit = async () => {
+    setIsSending(true);
     const id = params?.id;
-    if (!id || !name || typeof id !== 'string') return;
+    if (!id || !name || !email || typeof id !== 'string') return;
 
     let selections: Record<string, string[]> = {};
 
@@ -139,32 +147,33 @@ export default function RSVPFillPage() {
     await fetch('/api/save-response', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, name, selections }),
+      body: JSON.stringify({ id, name, email, selections }),
     });
 
-    router.push(`/results/${id}`);
+    router.push(`/rsvp/${id}/results_rsvp`);
   };
 
   return (
     <main className="relative flex flex-col min-h-screen bg-white text-gray-900">
-      {/* Floating logo */}
       <img
         src="/images/prikkr_logo_transparent.png"
         alt="Prikkr logo"
         onClick={() => router.push('/')}
-        className="absolute top-0 left-4 h-48 w-auto cursor-pointer z-10"
+        className="absolute top-2 left-2 h-20 sm:h-24 lg:h-48 w-auto cursor-pointer z-10"
       />
 
-      {/* Content section */}
-      <section className="w-full bg-red-50 py-12 px-6">
-        <div className="flex flex-col items-center text-center">
-          <h1 className="text-4xl font-bold mb-4 mt-4">Your Calendar Availability</h1>
+      <section className="w-full bg-red-50 py-16 px-4 sm:px-6">
+        <div className="flex flex-col items-center text-center mx-auto w-full max-w-[90rem]">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-10 sm:mb-12">
+            Your Calendar Availability
+          </h1>
 
           {range && (
-            <div className="text-center mb-4 text-lg">
-              <p>From: {range.from}</p>
-              <p>To: {range.to}</p>
-            </div>
+            <p className="text-base sm:text-lg text-gray-800 mb-8">
+              Select your availability between{' '}
+              <strong>{formatDisplayDate(range.from)}</strong> and{' '}
+              <strong>{formatDisplayDate(range.to)}</strong>
+            </p>
           )}
 
           <input
@@ -172,100 +181,105 @@ export default function RSVPFillPage() {
             placeholder="Your name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="border border-gray-300 rounded px-3 py-2 mb-6 w-full max-w-md text-base"
+            className="border border-gray-300 rounded px-4 py-2 mb-4 w-full max-w-md text-base"
           />
 
-          <div className="flex flex-col items-center gap-2 mb-6">
-            <div className="flex gap-4 items-center">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  checked={!customMode}
-                  onChange={() => setCustomMode(false)}
-                />
-                <span>Keep dates</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  checked={customMode}
-                  onChange={() => setCustomMode(true)}
-                />
-                <span>Custom dates</span>
-              </label>
-            </div>
-          </div>
-        </div>
+          <input
+            type="email"
+            placeholder="Your email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="border border-gray-300 rounded px-4 py-2 mb-8 w-full max-w-md text-base"
+          />
 
-        {dates.map(date => (
-          <div key={date} className="w-full max-w-2xl mb-4 mx-auto">
-            <div className="font-semibold mb-1 flex justify-between items-center">
-              <span>{date}</span>
-              {customMode && (
-                <button
-                  onClick={() => handleDayToggle(date)}
-                  className="text-blue-600 text-sm underline"
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-4 sm:gap-8 mb-10">
+            <label className="flex items-center gap-x-2 gap-y-1 text-base sm:text-lg">
+              <input type="radio" checked={!customMode} onChange={() => setCustomMode(false)} />
+              <span>Use current availability</span>
+            </label>
+            <label className="flex items-center gap-x-2 gap-y-1 text-base sm:text-lg">
+              <input type="radio" checked={customMode} onChange={() => setCustomMode(true)} />
+              <span>Manually select times</span>
+            </label>
+          </div>
+
+          {dates.map(date => (
+            <div
+              key={date}
+              className="bg-white rounded-xl shadow-md px-4 py-1 mb-2 w-full max-w-screen-xl mx-auto"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 w-full">
+                <div className="text-left sm:min-w-[10rem]">
+                  <div className="text-sm text-gray-500 font-medium">{getWeekday(date)}</div>
+                  <div className="text-base sm:text-lg font-semibold text-gray-900">
+                    {formatDisplayDate(date)}
+                  </div>
+                </div>
+
+                <div
+                  className={`w-full grid gap-x-3 gap-y-1 ${
+                    extendedHours ? 'grid-cols-4 sm:grid-cols-7' : 'grid-cols-4 sm:grid-cols-8'
+                  }`}
                 >
-                  {manualSelections[date]?.size === fullSlots.length
-                    ? 'Unselect all'
-                    : 'Select all'}
-                </button>
+                  {fullSlots.map(time => {
+                    const busy = isSlotBusy(time, date, busySlots);
+                    const isSelected = manualSelections[date]?.has(time);
+                    const showGreen = !customMode && !busy;
+                    const showRed = !customMode && busy;
+                    const endTime = `${String(Number(time.split(':')[0]) + 1).padStart(2, '0')}:00`;
+
+                    return (
+                      <button
+                        key={time}
+                        onClick={() => customMode && handleSlotToggle(date, time)}
+                        className={`min-w-[87px] sm:min-w-0 px-3 py-3 text-[10px] sm:text-sm font-semibold text-center rounded-xl w-full transition-all duration-100 shadow-[0_4px_10px_rgba(0,0,0,0.25)] border
+                          ${
+                            customMode
+                              ? isSelected
+                                ? 'bg-green-500 text-white'
+                                : 'bg-white text-gray-800 hover:bg-gray-100'
+                              : showGreen
+                              ? 'bg-green-500 text-white'
+                              : showRed
+                              ? 'bg-red-500 text-white'
+                              : 'bg-white text-gray-800 hover:bg-gray-100'
+                          }`}
+                      >
+                        {time} - {endTime}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {customMode && (
+                <div className="mt-2 flex justify-center w-full">
+                  <button
+                    onClick={() => handleDayToggle(date)}
+                    className="text-blue-600 text-sm underline"
+                  >
+                    {manualSelections[date]?.size === fullSlots.length ? 'Unselect all' : 'Select all'}
+                  </button>
+                </div>
               )}
             </div>
-            <div className="flex flex-wrap justify-center gap-2">
-              {fullSlots.map(time => {
-                const busy = isSlotBusy(time, date, busySlots);
-                const isSelected = manualSelections[date]?.has(time);
-                const showGreen = !customMode && !busy;
-                const showRed = !customMode && busy;
+          ))}
 
-                return (
-                  <button
-                    key={time}
-                    onClick={() => customMode && handleSlotToggle(date, time)}
-                    className={`
-                      px-2 py-1 text-sm border rounded 
-                      ${
-                        customMode
-                          ? isSelected
-                            ? 'bg-green-500 text-white'
-                            : 'bg-gray-100'
-                          : showGreen
-                          ? 'bg-green-500 text-white'
-                          : showRed
-                          ? 'bg-red-500 text-white'
-                          : 'bg-gray-200'
-                      }
-                    `}
-                  >
-                    {time}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-
-        <div className="text-center mt-8">
           <button
             onClick={handleSubmit}
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded shadow transition hover:scale-105"
-            disabled={!name}
+            className={`mt-6 px-6 py-3 text-base sm:text-lg font-semibold rounded-xl transition-all duration-150 transform hover:scale-105 shadow-[0_8px_20px_rgba(0,0,0,0.25)] bg-green-600 text-white hover:bg-green-700 border border-green-500 ${isSending || !name || !email ? 'opacity-70 cursor-not-allowed' : ''}`}
+            disabled={isSending || !name || !email}
           >
-            Send out!
+            {isSending ? 'Sending...' : 'Send out!'}
           </button>
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="w-full bg-gray-100 py-6 px-4 text-center text-sm text-gray-600">
-        <div className="mb-1 font-semibold text-gray-800">Prikkr</div>
-        <div className="mb-3 italic text-gray-600">the smart way to plan together.</div>
+        <div className="mb-1 font-semibold text-gray-800">📌Prikkr</div>
+        <div className="mb-3 italic text-gray-600">"The smart way to plan together."</div>
         <div className="mb-2">Office: Utrecht, Netherlands</div>
-        <button
-          onClick={() => router.push('/contact')}
-          className="text-blue-600 hover:underline"
-        >
+        <button onClick={() => router.push('/contact')} className="text-blue-600 hover:underline">
           Contact
         </button>
         <div className="mt-4 text-xs text-gray-400">
