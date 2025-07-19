@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
-
-const filePath = path.resolve(process.cwd(), 'responses.json');
+import redis from '@/lib/redis';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -13,12 +10,16 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const fileContent = await fs.readFile(filePath, 'utf-8');
-    const data: Record<string, any[]> = JSON.parse(fileContent);
+    const raw = await redis.get(`responses:${id}`);
 
-    const responses = data[id] || [];
+    if (!raw || typeof raw !== 'string') {
+      return NextResponse.json([], { status: 200 });
+    }
+
+    const responses = JSON.parse(raw);
     return NextResponse.json(responses);
   } catch (err) {
+    console.error('❌ Error reading responses from Redis:', err);
     return NextResponse.json({ error: 'Failed to read responses' }, { status: 500 });
   }
 }

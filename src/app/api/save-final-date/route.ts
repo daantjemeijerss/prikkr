@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import path from 'path';
-import { promises as fs } from 'fs';
-
-const filePath = path.resolve(process.cwd(), 'meta.json');
+import redis from '@/lib/redis'; // ✅ use alias path if it now works
 
 export async function POST(req: NextRequest) {
   const { id, date, time } = await req.json();
@@ -11,20 +8,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  let data: Record<string, any> = {};
   try {
-    const content = await fs.readFile(filePath, 'utf-8');
-    data = JSON.parse(content);
-  } catch {
-    console.log('No meta.json found, creating a new one');
+    const raw = await redis.get(`meta:${id}`);
+
+    if (!raw || typeof raw !== 'string') {
+      return NextResponse.json({ error: 'Event ID not found or invalid format' }, { status: 404 });
+    }
+
+    const meta = JSON.parse(raw);
+    meta.finalSelection = { date, time };
+
+    await redis.set(`meta:${id}`, JSON.stringify(meta));
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('❌ Error saving final selection:', err);
+    return NextResponse.json({ error: 'Failed to save final selection' }, { status: 500 });
   }
-
-  if (!data[id]) {
-    return NextResponse.json({ error: 'Event ID not found' }, { status: 404 });
-  }
-
-  data[id].finalSelection = { date, time };
-
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2));
-  return NextResponse.json({ success: true });
 }

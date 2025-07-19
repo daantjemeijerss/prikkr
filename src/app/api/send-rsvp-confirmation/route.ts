@@ -1,29 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import { promises as fs } from 'fs';
-import path from 'path';
+import redis from '@/lib/redis'; // ✅ use alias if supported
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
   console.log("📨 Received RSVP confirmation request:", body);
+
   const { name, email, eventName, creatorName, id } = body;
 
   if (!name || !email || !eventName || !creatorName) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  // Load meta.json to find creatorEmail
-  const metaPath = path.resolve(process.cwd(), 'meta.json');
-  let meta: Record<string, any> = {};
+  // Load creatorEmail from Redis
+  let creatorEmail: string | undefined;
   try {
-    const metaContent = await fs.readFile(metaPath, 'utf-8');
-    meta = JSON.parse(metaContent);
+    const metaRaw = await redis.get(`meta:${id}`);
+    if (metaRaw && typeof metaRaw === 'string') {
+      const meta = JSON.parse(metaRaw);
+      creatorEmail = meta.creatorEmail;
+    }
   } catch {
-    console.warn('⚠️ No meta.json found or failed to load');
+    console.warn('⚠️ Could not load metadata from Redis');
   }
 
-  // ⛔ Skip sending email if participant is the creator
-  if (meta[id]?.creatorEmail && meta[id].creatorEmail === email) {
+  // ⛔ Skip sending if user is the creator
+  if (creatorEmail && creatorEmail === email) {
     console.log(`⛔ Skipping RSVP confirmation email for creator: ${email}`);
     return NextResponse.json({ success: true, skippedCreator: true });
   }

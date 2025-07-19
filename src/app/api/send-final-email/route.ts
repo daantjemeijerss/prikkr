@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
 import nodemailer from 'nodemailer';
-
-const metaPath = path.resolve(process.cwd(), 'meta.json');
-const responsePath = path.resolve(process.cwd(), 'responses.json');
+import redis from '@/lib/redis'; // ✅ use alias if you're using `@/lib/...`
 
 function formatEmailDate(dateStr: string): string {
   const [year, month, day] = dateStr.split('-').map(Number);
@@ -29,20 +25,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Load metadata
-    const metaContent = await fs.readFile(metaPath, 'utf-8');
-    const metaData = JSON.parse(metaContent);
-    const eventMeta = metaData[id];
-    if (!eventMeta) {
+    // Load metadata from Redis
+    const metaRaw = await redis.get(`meta:${id}`);
+    if (!metaRaw || typeof metaRaw !== 'string') {
       return NextResponse.json({ error: 'Event ID not found in metadata' }, { status: 404 });
     }
 
+    const eventMeta = JSON.parse(metaRaw);
     const { creatorEmail, creatorName, eventName } = eventMeta;
 
-    // Load responses
-    const responseContent = await fs.readFile(responsePath, 'utf-8');
-    const responseData = JSON.parse(responseContent);
-    const responses = responseData[id] || [];
+    // Load responses from Redis
+    const responsesRaw = await redis.get(`responses:${id}`);
+    const responses = responsesRaw && typeof responsesRaw === 'string' ? JSON.parse(responsesRaw) : [];
 
     const participantEmails = responses.map((r: any) => r.email).filter((e: string) => e !== creatorEmail);
     const participantNames: Record<string, string> = {};
@@ -61,7 +55,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Send to participants individually
+    // Send to participants
     for (let i = 0; i < participantEmails.length; i++) {
       const email = participantEmails[i];
       const name = participantNames[email] || 'there';
@@ -112,6 +106,7 @@ export async function POST(req: NextRequest) {
 
     await transporter.sendMail(creatorMailOptions);
     console.log('✅ [send-final-email] All emails sent');
+
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('❌ Failed to send emails:', err);

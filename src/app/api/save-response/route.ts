@@ -1,10 +1,5 @@
-// ✅ FILE: src/app/api/save-response/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
-
-const responsesPath = path.resolve(process.cwd(), 'responses.json');
-const metaPath = path.resolve(process.cwd(), 'meta.json');
+import redis from '@/lib/redis'; // ✅ use alias if configured, or keep relative if needed
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,41 +12,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields or empty selections' }, { status: 400 });
     }
 
-    // Read existing responses
-    let data: Record<string, { name: string; email: string; selections: any }[]> = {};
-    try {
-      const fileContent = await fs.readFile(responsesPath, 'utf-8');
-      data = JSON.parse(fileContent);
-    } catch {
-      // OK if file doesn't exist yet
+    const redisKey = `responses:${id}`;
+    let existingData: { name: string; email: string; selections: any }[] = [];
+
+    const stored = await redis.get(redisKey);
+    if (stored && typeof stored === 'string') {
+      try {
+        existingData = JSON.parse(stored);
+      } catch {
+        console.warn('⚠️ Failed to parse existing Redis responses');
+      }
     }
 
-    if (!data[id]) data[id] = [];
-
-    // Overwrite previous response if email already exists
-    const existingIndex = data[id].findIndex(entry => entry.email === email);
+    const existingIndex = existingData.findIndex(entry => entry.email === email);
     if (existingIndex !== -1) {
-      data[id][existingIndex] = { name, email, selections };
+      existingData[existingIndex] = { name, email, selections };
       console.log(`🔁 Updated response for ${email}`);
     } else {
-      data[id].push({ name, email, selections });
+      existingData.push({ name, email, selections });
       console.log(`✅ New response saved for ${email}`);
     }
 
-    // Write updated responses
-    await fs.writeFile(responsesPath, JSON.stringify(data, null, 2));
+    await redis.set(redisKey, JSON.stringify(existingData));
 
-    // Read event metadata
     let eventMeta: { eventName: string; creatorName: string; creatorEmail?: string } | undefined;
-    try {
-      const metaContent = await fs.readFile(metaPath, 'utf-8');
-      const meta = JSON.parse(metaContent);
-      eventMeta = meta[id];
-    } catch {
-      console.warn('⚠️ No meta.json found or failed to load');
+    const metaRaw = await redis.get(`meta:${id}`);
+    if (metaRaw && typeof metaRaw === 'string') {
+      try {
+        eventMeta = JSON.parse(metaRaw);
+      } catch {
+        console.warn('⚠️ Failed to parse event metadata');
+      }
     }
 
-    // If not the creator, send RSVP confirmation
     if (
       eventMeta?.eventName &&
       eventMeta?.creatorName &&
@@ -65,6 +58,7 @@ export async function POST(req: NextRequest) {
           email,
           eventName: eventMeta.eventName,
           creatorName: eventMeta.creatorName,
+          id, // ✅ Optional: useful for skip check in confirmation
         }),
       });
     } else {

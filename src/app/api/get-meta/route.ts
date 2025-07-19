@@ -1,28 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { NextResponse } from 'next/server';
+import redis from '@/lib/redis';
 
-const filePath = path.resolve(process.cwd(), 'meta.json');
-
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get('id');
-
-  if (!id) {
-    return NextResponse.json({ error: 'Missing id' }, { status: 400 });
-  }
-
+export async function GET() {
   try {
-    const content = await fs.readFile(filePath, 'utf-8');
-    const data = JSON.parse(content);
-    const meta = data[id];
+    const metaRaw = await redis.get('meta');
 
-    if (!meta) {
-      return NextResponse.json({ error: 'No metadata found for this ID' }, { status: 404 });
+    if (!metaRaw || typeof metaRaw !== 'string') {
+      return NextResponse.json({}, { status: 200 });
     }
 
+    const meta = JSON.parse(metaRaw);
     return NextResponse.json(meta);
   } catch (err) {
-    return NextResponse.json({ error: 'Failed to read metadata' }, { status: 500 });
+    console.error('❌ Failed to fetch metadata from Redis:', err);
+    return NextResponse.json({ error: 'Failed to load metadata' }, { status: 500 });
   }
 }
