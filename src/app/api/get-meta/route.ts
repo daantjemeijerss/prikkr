@@ -8,6 +8,9 @@ export async function GET(req: NextRequest) {
   try {
     console.log('📥 Incoming GET /api/get-meta');
 
+    console.log('🔍 Reading from Redis URL:', process.env.UPSTASH_REDIS_REST_URL);
+    console.log('🔐 Using Redis token:', process.env.UPSTASH_REDIS_REST_TOKEN?.slice(0, 20) + '...');
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
 
