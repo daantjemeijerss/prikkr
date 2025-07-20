@@ -12,13 +12,17 @@ export async function GET(req: NextRequest) {
   try {
     const raw = await kv.get(`responses:${id}`);
 
-    if (!raw || typeof raw !== 'string') {
+    if (!raw) {
       console.warn(`⚠️ No responses found for id: ${id}`);
       return NextResponse.json([], { status: 200 });
     }
 
-    const responses = JSON.parse(raw);
-    return NextResponse.json(responses);
+    if (!Array.isArray(raw)) {
+      console.warn('⚠️ Responses from KV were not an array');
+      return NextResponse.json([], { status: 200 });
+    }
+
+    return NextResponse.json(raw);
   } catch (err) {
     console.error('❌ Error reading responses from KV:', err);
     return NextResponse.json({ error: 'Failed to read responses' }, { status: 500 });

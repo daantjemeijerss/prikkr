@@ -16,13 +16,10 @@ export async function POST(req: NextRequest) {
     let existingData: { name: string; email: string; selections: any }[] = [];
 
     const stored = await kv.get(redisKey);
-    if (stored && typeof stored === 'string') {
-      try {
-        existingData = JSON.parse(stored);
-      } catch {
-        console.warn('⚠️ Failed to parse existing KV responses');
-      }
-    }
+if (Array.isArray(stored)) {
+  existingData = stored;
+}
+
 
     const existingIndex = existingData.findIndex(entry => entry.email === email);
     if (existingIndex !== -1) {
@@ -33,16 +30,14 @@ export async function POST(req: NextRequest) {
       console.log(`✅ New response saved for ${email}`);
     }
 
-    await kv.set(redisKey, JSON.stringify(existingData));
+await kv.set(redisKey, existingData); // no need to stringify
 
     let eventMeta: { eventName: string; creatorName: string; creatorEmail?: string } | undefined;
     const metaRaw = await kv.get(`meta:${id}`);
-    if (metaRaw && typeof metaRaw === 'string') {
-      try {
-        eventMeta = JSON.parse(metaRaw);
-      } catch {
-        console.warn('⚠️ Failed to parse event metadata');
-      }
+    if (!metaRaw) {
+      console.error('❌ Failed to retrieve metadata for ID:', id);
+    } else {
+      eventMeta = metaRaw as typeof eventMeta;
     }
 
     if (

@@ -12,12 +12,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
+  if (!email.includes('@')) {
+    return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
+  }
+
   // Load creatorEmail from KV
   let creatorEmail: string | undefined;
   try {
     const metaRaw = await kv.get(`meta:${id}`);
-    if (metaRaw && typeof metaRaw === 'string') {
-      const meta = JSON.parse(metaRaw);
+    if (metaRaw) {
+      const meta = metaRaw as { creatorEmail?: string };
       creatorEmail = meta.creatorEmail;
     }
   } catch {

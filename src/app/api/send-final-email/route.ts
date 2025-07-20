@@ -25,23 +25,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Load metadata from KV
+    // Load metadata
     const metaRaw = await kv.get(`meta:${id}`);
-    if (!metaRaw || typeof metaRaw !== 'string') {
+    if (!metaRaw) {
       return NextResponse.json({ error: 'Event ID not found in metadata' }, { status: 404 });
     }
 
-    const eventMeta = JSON.parse(metaRaw);
+    const eventMeta = metaRaw as {
+      creatorEmail: string;
+      creatorName: string;
+      eventName: string;
+    };
     const { creatorEmail, creatorName, eventName } = eventMeta;
 
-    // Load responses from KV
+    // Load responses
     const responsesRaw = await kv.get(`responses:${id}`);
-    const responses = responsesRaw && typeof responsesRaw === 'string' ? JSON.parse(responsesRaw) : [];
+    const responses = Array.isArray(responsesRaw) ? responsesRaw : [];
 
-    const participantEmails = responses.map((r: any) => r.email).filter((e: string) => e !== creatorEmail);
+    const participantEmails = responses
+      .map((r: any) => r.email)
+      .filter((e: string) => e && e !== creatorEmail);
+
     const participantNames: Record<string, string> = {};
     responses.forEach((r: any) => {
-      participantNames[r.email] = r.name;
+      if (r.email) participantNames[r.email] = r.name;
     });
 
     const formattedDate = formatEmailDate(date);
@@ -56,8 +63,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Send to participants
-    for (let i = 0; i < participantEmails.length; i++) {
-      const email = participantEmails[i];
+    for (const email of participantEmails) {
       const name = participantNames[email] || 'there';
 
       console.log(`📧 Sending email to participant: ${email} (${name})`);

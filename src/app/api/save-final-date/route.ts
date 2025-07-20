@@ -11,14 +11,14 @@ export async function POST(req: NextRequest) {
   try {
     const raw = await kv.get(`meta:${id}`);
 
-    if (!raw || typeof raw !== 'string') {
-      return NextResponse.json({ error: 'Event ID not found or invalid format' }, { status: 404 });
+    if (!raw) {
+      return NextResponse.json({ error: 'Event ID not found' }, { status: 404 });
     }
 
-    const meta = JSON.parse(raw);
+    const meta = raw as Record<string, any>;
     meta.finalSelection = { date, time };
 
-    await kv.set(`meta:${id}`, JSON.stringify(meta));
+    await kv.set(`meta:${id}`, meta);
 
     return NextResponse.json({ success: true });
   } catch (err) {
