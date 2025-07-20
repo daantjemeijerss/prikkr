@@ -1,6 +1,8 @@
 // app/api/get-meta/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+console.log('💡 get-meta route reached');
 import redis from '@/lib/redis';
+console.log('🧩 Redis client was imported!');
 
 export async function GET(req: NextRequest) {
   try {
