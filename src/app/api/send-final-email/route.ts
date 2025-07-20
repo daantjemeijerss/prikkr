@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import redis from '@/lib/redis'; // ✅ use alias if you're using `@/lib/...`
+import { kv } from '@vercel/kv';
 
 function formatEmailDate(dateStr: string): string {
   const [year, month, day] = dateStr.split('-').map(Number);
@@ -25,8 +25,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Load metadata from Redis
-    const metaRaw = await redis.get(`meta:${id}`);
+    // Load metadata from KV
+    const metaRaw = await kv.get(`meta:${id}`);
     if (!metaRaw || typeof metaRaw !== 'string') {
       return NextResponse.json({ error: 'Event ID not found in metadata' }, { status: 404 });
     }
@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
     const eventMeta = JSON.parse(metaRaw);
     const { creatorEmail, creatorName, eventName } = eventMeta;
 
-    // Load responses from Redis
-    const responsesRaw = await redis.get(`responses:${id}`);
+    // Load responses from KV
+    const responsesRaw = await kv.get(`responses:${id}`);
     const responses = responsesRaw && typeof responsesRaw === 'string' ? JSON.parse(responsesRaw) : [];
 
     const participantEmails = responses.map((r: any) => r.email).filter((e: string) => e !== creatorEmail);

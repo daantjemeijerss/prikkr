@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { kv } from '@vercel/kv';
 import nodemailer from 'nodemailer';
-import redis from '@/lib/redis';
 
 async function sendResultsEmail(to: string, name: string, eventName: string, id: string) {
   const shareLink = `https://prikkr.com/rsvp/${id}/login`;
@@ -59,14 +59,14 @@ export async function POST(req: NextRequest) {
     }
 
     const data = { range, extendedHours, creatorEmail, creatorName, eventName };
-        const redisKey = `meta:${id}`;
+    const redisKey = `meta:${id}`;
     const redisValue = JSON.stringify(data);
 
     console.log('🔑 Redis Key:', redisKey);
     console.log('📦 Redis Value:', redisValue);
 
-    const result = await redis.set(`meta:${id}`, JSON.stringify(data));
-    console.log('✅ Redis save result:', result);
+    const result = await kv.set(redisKey, redisValue);
+    console.log('✅ KV save result:', result);
 
     await sendResultsEmail(creatorEmail, creatorName, eventName, id);
 

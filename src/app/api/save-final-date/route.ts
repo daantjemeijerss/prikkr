@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import redis from '@/lib/redis'; // ✅ use alias path if it now works
+import { kv } from '@vercel/kv';
 
 export async function POST(req: NextRequest) {
   const { id, date, time } = await req.json();
@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const raw = await redis.get(`meta:${id}`);
+    const raw = await kv.get(`meta:${id}`);
 
     if (!raw || typeof raw !== 'string') {
       return NextResponse.json({ error: 'Event ID not found or invalid format' }, { status: 404 });
@@ -18,11 +18,11 @@ export async function POST(req: NextRequest) {
     const meta = JSON.parse(raw);
     meta.finalSelection = { date, time };
 
-    await redis.set(`meta:${id}`, JSON.stringify(meta));
+    await kv.set(`meta:${id}`, JSON.stringify(meta));
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('❌ Error saving final selection:', err);
+    console.error('❌ Error saving final selection to KV:', err);
     return NextResponse.json({ error: 'Failed to save final selection' }, { status: 500 });
   }
 }

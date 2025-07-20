@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import redis from '@/lib/redis';
+import { kv } from '@vercel/kv';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -10,16 +10,17 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const raw = await redis.get(`responses:${id}`);
+    const raw = await kv.get(`responses:${id}`);
 
     if (!raw || typeof raw !== 'string') {
+      console.warn(`⚠️ No responses found for id: ${id}`);
       return NextResponse.json([], { status: 200 });
     }
 
     const responses = JSON.parse(raw);
     return NextResponse.json(responses);
   } catch (err) {
-    console.error('❌ Error reading responses from Redis:', err);
+    console.error('❌ Error reading responses from KV:', err);
     return NextResponse.json({ error: 'Failed to read responses' }, { status: 500 });
   }
 }

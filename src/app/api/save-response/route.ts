@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import redis from '@/lib/redis'; // ✅ use alias if configured, or keep relative if needed
+import { kv } from '@vercel/kv';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,12 +15,12 @@ export async function POST(req: NextRequest) {
     const redisKey = `responses:${id}`;
     let existingData: { name: string; email: string; selections: any }[] = [];
 
-    const stored = await redis.get(redisKey);
+    const stored = await kv.get(redisKey);
     if (stored && typeof stored === 'string') {
       try {
         existingData = JSON.parse(stored);
       } catch {
-        console.warn('⚠️ Failed to parse existing Redis responses');
+        console.warn('⚠️ Failed to parse existing KV responses');
       }
     }
 
@@ -33,10 +33,10 @@ export async function POST(req: NextRequest) {
       console.log(`✅ New response saved for ${email}`);
     }
 
-    await redis.set(redisKey, JSON.stringify(existingData));
+    await kv.set(redisKey, JSON.stringify(existingData));
 
     let eventMeta: { eventName: string; creatorName: string; creatorEmail?: string } | undefined;
-    const metaRaw = await redis.get(`meta:${id}`);
+    const metaRaw = await kv.get(`meta:${id}`);
     if (metaRaw && typeof metaRaw === 'string') {
       try {
         eventMeta = JSON.parse(metaRaw);
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
           email,
           eventName: eventMeta.eventName,
           creatorName: eventMeta.creatorName,
-          id, // ✅ Optional: useful for skip check in confirmation
+          id,
         }),
       });
     } else {

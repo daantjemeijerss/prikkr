@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import redis from '@/lib/redis'; // ✅ use alias if supported
+import { kv } from '@vercel/kv';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -12,16 +12,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  // Load creatorEmail from Redis
+  // Load creatorEmail from KV
   let creatorEmail: string | undefined;
   try {
-    const metaRaw = await redis.get(`meta:${id}`);
+    const metaRaw = await kv.get(`meta:${id}`);
     if (metaRaw && typeof metaRaw === 'string') {
       const meta = JSON.parse(metaRaw);
       creatorEmail = meta.creatorEmail;
     }
   } catch {
-    console.warn('⚠️ Could not load metadata from Redis');
+    console.warn('⚠️ Could not load metadata from KV');
   }
 
   // ⛔ Skip sending if user is the creator
