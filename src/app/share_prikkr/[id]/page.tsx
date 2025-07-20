@@ -187,13 +187,18 @@ export default function SharePrikkrDatePage() {
         )}
       </div>
 
-      <footer className="w-full bg-gray-100 py-6 px-4 text-center text-sm text-gray-600 mt-auto">
-        <div className="mb-1 font-semibold text-gray-800">📌Prikkr</div>
-        <div className="mb-3 italic text-gray-600">"The smart way to plan together."</div>
+            {/* Footer */}
+      <footer className="w-full bg-gray-100 py-6 px-4 text-center text-sm text-gray-600">
+        <div className="mb-1 font-semibold text-gray-800 text-base">📌Prikkr</div>
+        <div className="mb-3 italic text-gray-600 text-sm">"The smart way to plan together."</div>
         <div className="mb-2">Office: Utrecht, Netherlands</div>
-        <button onClick={() => router.push('/contact')} className="text-blue-600 hover:underline">
-          Contact
-        </button>
+
+        <div className="flex justify-center gap-4 text-blue-600 text-sm mt-2">
+          <button onClick={() => router.push('/contact')} className="hover:underline">Contact</button>
+          <button onClick={() => router.push('/privacy-policy')} className="hover:underline">Privacy Policy</button>
+          <button onClick={() => router.push('/terms')} className="hover:underline">Terms of Service</button>
+        </div>
+
         <div className="mt-4 text-xs text-gray-400">
           &copy; {new Date().getFullYear()} Prikkr. All rights reserved.
         </div>

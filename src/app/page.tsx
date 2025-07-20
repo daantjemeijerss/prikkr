@@ -94,20 +94,37 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="w-full bg-gray-100 py-6 px-4 text-center text-sm text-gray-600">
-        <div className="mb-1 font-semibold text-gray-800 text-base">📌Prikkr</div>
-        <div className="mb-3 italic text-gray-600 text-sm">"The smart way to plan together."</div>
-        <div className="mb-2">Office: Utrecht, Netherlands</div>
-        <button
-          onClick={() => router.push('/contact')}
-          className="text-blue-600 hover:underline"
-        >
-          Contact
-        </button>
-        <div className="mt-4 text-xs text-gray-400">
-          &copy; {new Date().getFullYear()} Prikkr. All rights reserved.
-        </div>
-      </footer>
+<footer className="w-full bg-gray-100 py-6 px-4 text-center text-sm text-gray-600">
+  <div className="mb-1 font-semibold text-gray-800 text-base">📌Prikkr</div>
+  <div className="mb-3 italic text-gray-600 text-sm">"The smart way to plan together."</div>
+  <div className="mb-2">Office: Utrecht, Netherlands</div>
+
+  <div className="space-x-4">
+    <button
+      onClick={() => router.push('/contact')}
+      className="text-blue-600 hover:underline"
+    >
+      Contact
+    </button>
+    <button
+      onClick={() => router.push('/privacy-policy')}
+      className="text-blue-600 hover:underline"
+    >
+      Privacy Policy
+    </button>
+    <button
+      onClick={() => router.push('/terms')}
+      className="text-blue-600 hover:underline"
+    >
+      Terms of Service
+    </button>
+  </div>
+
+  <div className="mt-4 text-xs text-gray-400">
+    &copy; {new Date().getFullYear()} Prikkr. All rights reserved.
+  </div>
+</footer>
+
     </main>
   )
 }
