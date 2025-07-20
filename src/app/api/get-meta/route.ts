@@ -1,12 +1,16 @@
 // app/api/get-meta/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { Redis } from '@upstash/redis';
 console.log('💡 get-meta route reached');
-import redis from '@/lib/redis';
-console.log('🧩 Redis client was imported!');
 
 export async function GET(req: NextRequest) {
   try {
     console.log('📥 Incoming GET /api/get-meta');
+
+    const redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    });
 
     console.log('🔍 Reading from Redis URL:', process.env.UPSTASH_REDIS_REST_URL);
     console.log('🔐 Using Redis token:', process.env.UPSTASH_REDIS_REST_TOKEN?.slice(0, 20) + '...');
