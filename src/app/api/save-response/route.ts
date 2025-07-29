@@ -13,24 +13,25 @@ export async function POST(req: NextRequest) {
     }
 
     const redisKey = `responses:${id}`;
-    let existingData: { name: string; email: string; selections: any }[] = [];
+    let existingData: { name: string; email: string; selections: any; createdAt: number }[] = [];
 
     const stored = await kv.get(redisKey);
-if (Array.isArray(stored)) {
-  existingData = stored;
-}
+    if (Array.isArray(stored)) {
+      existingData = stored;
+    }
 
-
+    const now = Date.now();
     const existingIndex = existingData.findIndex(entry => entry.email === email);
+
     if (existingIndex !== -1) {
-      existingData[existingIndex] = { name, email, selections };
+      existingData[existingIndex] = { name, email, selections, createdAt: now };
       console.log(`🔁 Updated response for ${email}`);
     } else {
-      existingData.push({ name, email, selections });
+      existingData.push({ name, email, selections, createdAt: now });
       console.log(`✅ New response saved for ${email}`);
     }
 
-await kv.set(redisKey, existingData); // no need to stringify
+    await kv.set(redisKey, existingData);
 
     let eventMeta: { eventName: string; creatorName: string; creatorEmail?: string } | undefined;
     const metaRaw = await kv.get(`meta:${id}`);

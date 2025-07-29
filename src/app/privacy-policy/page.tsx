@@ -78,17 +78,19 @@ export default function PrivacyPolicyPage() {
             We do not store Google Calendar data on our servers unless explicitly required to show group availability. When stored, data is kept in secure, access-controlled infrastructure managed by Vercel and is never shared with third parties.
           </p>
 
-          <h2 className="text-2xl sm:text-3xl font-semibold mt-10 mb-4 pt-4 border-t border-gray-200">
-            Data Retention & Deletion
-          </h2>
+<h2 className="text-2xl sm:text-3xl font-semibold mt-10 mb-4 pt-4 border-t border-gray-200">
+  Data Retention & Deletion
+</h2>
 
-          <p className="mb-4 text-base sm:text-lg text-gray-800">
-            We retain user data (such as name, email, and selected availability) only as long as needed to complete the planning process. Calendar free/busy data is not stored permanently and is retrieved only during the session.
-          </p>
+<p className="mb-4 text-base sm:text-lg text-gray-800">
+  We store planning-related data — such as the event name, date range, creator name and email, and participant availability responses — in a secure key-value store hosted by Vercel. This data is used solely for the purpose of supporting the group scheduling process.
+</p>
 
-          <p className="mb-4 text-base sm:text-lg text-gray-800">
-            All planning-related data is automatically deleted after 30 days. You can request the manual deletion of your information at any time by contacting us at <a href="mailto:prikkrgroupplanner@gmail.com" className="text-blue-600 underline">prikkrgroupplanner@gmail.com</a>.
-          </p>
+<p className="mb-4 text-base sm:text-lg text-gray-800">
+  All planning data is retained for up to <strong>1 year</strong> after creation, which matches the validity period of the event link. After that, the data is automatically deleted. You may also request manual deletion of your data at any time by contacting us at <a href="mailto:prikkrgroupplanner@gmail.com" className="text-blue-600 underline">prikkrgroupplanner@gmail.com</a>.
+</p>
+
+
         </div>
       </section>
 

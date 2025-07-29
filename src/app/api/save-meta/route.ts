@@ -58,12 +58,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const data = { range, extendedHours, creatorEmail, creatorName, eventName };
+    const data = { range, extendedHours, creatorEmail, creatorName, eventName, createdAt: Date.now() };
     const redisKey = `meta:${id}`;
     const redisValue = JSON.stringify(data);
-
-    console.log('🔑 Redis Key:', redisKey);
-    console.log('📦 Redis Value:', redisValue);
 
     const result = await kv.set(redisKey, redisValue);
     console.log('✅ KV save result:', result);
