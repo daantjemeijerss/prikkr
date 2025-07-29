@@ -1,3 +1,9 @@
 {
-  "regions": ["fra1"]
+  "regions": ["fra1"],
+  "cron": [
+    {
+      "path": "/api/cleanup",
+      "schedule": "0 6 * * *"
+    }
+  ]
 }
