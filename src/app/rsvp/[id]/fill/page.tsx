@@ -3,107 +3,18 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import {fetchOutlookBusy} from '@/calendar/fetchOutlookBusy';
+import {fetchGoogleBusy} from '@/calendar/fetchGoogleBusy';
 import { DateTime } from 'luxon';
+import {
+  getDateRange,
+  getWeekday,
+  formatDisplayDate,
+  getSlotTypeLabel,
+  getSlotBusySegments,
+  TimeSlot
+} from '@/utils/calendarHelpers';
 
-interface TimeSlot {
-  start: string;
-  end: string;
-}
-
-function getDateRange(from: string, to: string): string[] {
-  const dates = [];
-  const current = new Date(from);
-  const endDate = new Date(to);
-  while (current <= endDate) {
-    dates.push(current.toISOString().split('T')[0]);
-    current.setDate(current.getDate() + 1);
-  }
-  return dates;
-}
-
-function getWeekday(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', { weekday: 'long' });
-}
-
-function formatDisplayDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function getSlotBusySegments(
-  slotTime: string,
-  date: string,
-  busySlots: TimeSlot[],
-  slotDurationMinutes: number
-): { from: number; to: number; color: string }[] {
-    if (!slotTime || !slotTime.includes(':')) {
-    console.warn('⚠️ Invalid slotTime passed to getSlotBusySegments:', slotTime);
-    return []; // Skip processing if invalid (e.g. 'All Day')
-  }
-  const [hour, minute] = slotTime.split(':').map(Number);
-  const slotStart = DateTime.fromObject(
-    {
-      year: Number(date.split('-')[0]),
-      month: Number(date.split('-')[1]),
-      day: Number(date.split('-')[2]),
-      hour,
-      minute,
-    },
-    { zone: 'Europe/Amsterdam' }
-  );
-  const slotEnd = slotStart.plus({ minutes: slotDurationMinutes });
-  const total = slotEnd.diff(slotStart, 'minutes').minutes;
-  let cursor = 0;
-
-  const overlapping = busySlots
-    .map(({ start, end }) => {
-      const busyStart = DateTime.fromISO(start);
-      const busyEnd = DateTime.fromISO(end);
-      return { busyStart, busyEnd };
-    })
-    .filter(({ busyStart, busyEnd }) => busyStart < slotEnd && busyEnd > slotStart)
-    .map(({ busyStart, busyEnd }) => ({
-      start: Math.max(0, busyStart.diff(slotStart, 'minutes').minutes),
-      end: Math.min(total, busyEnd.diff(slotStart, 'minutes').minutes),
-    }))
-    .sort((a, b) => a.start - b.start);
-
-  const segments: { from: number; to: number; color: string }[] = [];
-  for (const { start, end } of overlapping) {
-    if (start > cursor) {
-      segments.push({ from: cursor / total, to: start / total, color: '#22c55e' });
-    }
-    segments.push({ from: start / total, to: end / total, color: '#ef4444' });
-    cursor = end;
-  }
-  if (cursor < total) {
-    segments.push({ from: cursor / total, to: 1, color: '#22c55e' });
-  }
-  return segments;
-}
-
-const getSlotTypeLabel = (duration: string | number): string => {
-  const num = parseInt(String(duration));
-  switch (num) {
-    case 1440:
-      return 'daily';
-    case 60:
-      return 'hourly';
-    case 30:
-      return 'half-hour';
-    case 15:
-      return 'quarter-hour';
-    case 10:
-      return '10-minutes';
-    default:
-      return 'custom';
-  }
-};
 
 
 export default function RSVPFillPage() {
@@ -141,48 +52,22 @@ export default function RSVPFillPage() {
       });
   }, [params]);
 
-  useEffect(() => {
-    if (!range || !session?.accessToken || !session.provider) return;
+useEffect(() => {
+  if (!range || !session?.accessToken || !session.provider) return;
 
-    const fetchGoogleBusy = async () => {
-      const res = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          timeMin: `${range.from}T00:00:00.000Z`,
-          timeMax: `${range.to}T23:59:59.999Z`,
-          items: [{ id: 'primary' }],
-        }),
-      });
-      const data = await res.json();
-      setBusySlots(data.calendars?.primary?.busy || []);
-    };
-
-    const fetchOutlookBusy = async () => {
-      const timeMin = `${range.from}T00:00:00Z`;
-      const timeMax = `${range.to}T23:59:59Z`;
-      const res = await fetch(
-        `https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=${timeMin}&endDateTime=${timeMax}`,
-        { headers: { Authorization: `Bearer ${session.accessToken}` } }
-      );
-      const data = await res.json();
-      const busy: TimeSlot[] = (data.value || []).map((item: any) => {
-  const start = DateTime.fromISO(item.start.dateTime, { zone: 'utc' }).setZone('Europe/Amsterdam');
-  const end = DateTime.fromISO(item.end.dateTime, { zone: 'utc' }).setZone('Europe/Amsterdam');
-  return {
-    start: start.toISO(),
-    end: end.toISO(),
+  const loadBusySlots = async () => {
+    if (session.provider === 'google') {
+      const slots = await fetchGoogleBusy(range.from, range.to, session.accessToken);
+      setBusySlots(slots);
+    } else if (session.provider === 'azure-ad') {
+      const slots = await fetchOutlookBusy(range.from, range.to, session.accessToken);
+      setBusySlots(slots);
+    }
   };
-});
-      setBusySlots(busy);
-    };
 
-    if (session.provider === 'google') fetchGoogleBusy();
-    else if (session.provider === 'azure-ad') fetchOutlookBusy();
-  }, [range, session]);
+  loadBusySlots();
+}, [range, session]);
+
 
   const generateSlots = () => {
   if (slotDuration === 'daily' || slotDuration === '1440') return ['All Day'];
