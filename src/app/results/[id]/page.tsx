@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { DateTime } from 'luxon';
+
 
 interface ResponseEntry {
   name: string;
@@ -12,6 +14,38 @@ function getWeekday(dateStr: string): string {
   const date = new Date(dateStr);
   return date.toLocaleDateString('en-US', { weekday: 'long' });
 }
+
+function formatDisplayDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function getDateRange(from: string, to: string): string[] {
+  const dates = [];
+  const current = new Date(from);
+  const end = new Date(to);
+  while (current <= end) {
+    dates.push(current.toISOString().split('T')[0]);
+    current.setDate(current.getDate() + 1);
+  }
+  return dates;
+}
+
+function groupDatesByWeek(dates: string[]) {
+  const weeks: Record<string, string[]> = {};
+  dates.forEach((dateStr) => {
+    const dt = DateTime.fromISO(dateStr);
+    const weekKey = `Week ${dt.weekNumber} (${dt.startOf('week').toFormat('dd MMM')} - ${dt.endOf('week').toFormat('dd MMM')})`;
+    if (!weeks[weekKey]) weeks[weekKey] = [];
+    weeks[weekKey].push(dateStr);
+  });
+  return weeks;
+}
+
 
 export default function ResultsPage() {
   const params = useParams();
@@ -25,6 +59,34 @@ export default function ResultsPage() {
   const [showPopup, setShowPopup] = useState(false);
   const [isPrikkrSending, setIsPrikkrSending] = useState(false);
   const [routingTarget, setRoutingTarget] = useState<string | null>(null);
+  const [slotDuration, setSlotDuration] = useState<string>('60'); // default is hourly
+
+ function durationInMinutes(value: string | number): number {
+  const map: Record<string, number> = {
+    '5-minutes': 5,
+    '10-minutes': 10,
+    'quarter-hour': 15,
+    'half-hour': 30,
+    'hourly': 60,
+    'daily': 1440,
+  };
+  if (typeof value === 'number') return value;
+  if (!isNaN(Number(value))) return Number(value);
+  return map[value] ?? 60;
+}
+
+function generateSlots() {
+  const slots: string[] = [];
+  const increment = durationInMinutes(slotDuration);
+  for (let hour = 9; hour <= (extendedHours ? 22 : 17); hour++) {
+    for (let minute = 0; minute < 60; minute += increment) {
+      const hh = String(hour).padStart(2, '0');
+      const mm = String(minute).padStart(2, '0');
+      slots.push(`${hh}:${mm}`);
+    }
+  }
+  return slots;
+}
 
 
   useEffect(() => {
@@ -33,6 +95,8 @@ export default function ResultsPage() {
       const parsed = JSON.parse(cached);
       setRange(parsed.range);
       setExtendedHours(parsed.extendedHours);
+      setSlotDuration(String(parsed.slotDuration || '60'));
+
     }
   }, [range]);
 
@@ -60,6 +124,7 @@ export default function ResultsPage() {
     const meta = await res.json();
     setRange(meta.range);
     setExtendedHours(meta.extendedHours);
+    setSlotDuration(String(meta.slotDuration || '60'));
   }
 
   async function fetchResponses() {
@@ -126,12 +191,24 @@ export default function ResultsPage() {
     });
   }
 
+  const isDaily = slotDuration === '1440';
+
+function groupWeekly(dates: string[]): string[][] {
+  const weeks: string[][] = [];
+  for (let i = 0; i < dates.length; i += 7) {
+    weeks.push(dates.slice(i, i + 7));
+  }
+  return weeks;
+}
+
+
   const sortedDates = range ? getDateRange(range.from, range.to) : [];
   const groupedTopSlots = bestTimeSlots.reduce((acc, slot) => {
     if (!acc[slot.date]) acc[slot.date] = [];
     acc[slot.date].push(slot);
     return acc;
   }, {} as Record<string, { time: string; percent: number }[]>);
+
 
   return (
     <main className="relative flex flex-col min-h-screen bg-white text-gray-900">
@@ -147,21 +224,39 @@ export default function ResultsPage() {
           <p className="text-base sm:text-lg font-medium text-gray-700 mb-4">
             {total} participant{total !== 1 ? 's' : ''}
           </p>
-          <button
-  onClick={() => {
-    setIsPrikkrSending(true);
-    setTimeout(() => {
-      setShowPopup(true);
-      setIsPrikkrSending(false);
-    }, 200); // Optional small delay to show spinner if needed
-  }}
-  disabled={isPrikkrSending}
-  className={`mb-6 px-6 py-3 text-base sm:text-lg font-semibold rounded-xl transition-all duration-200 transform text-gray-800 border border-yellow-300 shadow-[0_8px_20px_rgba(0,0,0,0.25)] ${
-    isPrikkrSending ? 'bg-gray-400 cursor-not-allowed' : 'hover:scale-105 bg-yellow-400 hover:bg-yellow-400'
-  }`}
->
-  {isPrikkrSending ? 'Opening...' : '📌 Prikkr your date!'}
-</button>
+          
+  <div className="flex flex-col items-center mb-8">
+  <button
+    onClick={() => {
+      setIsPrikkrSending(true);
+      setTimeout(() => {
+        setShowPopup(true);
+        setIsPrikkrSending(false);
+      }, 200);
+    }}
+    disabled={isPrikkrSending}
+    className={`px-6 py-3 text-base sm:text-lg font-semibold rounded-xl transition-all duration-200 transform text-gray-800 border border-yellow-300 shadow-[0_8px_20px_rgba(0,0,0,0.25)] ${
+      isPrikkrSending ? 'bg-gray-400 cursor-not-allowed' : 'hover:scale-105 bg-yellow-400 hover:bg-yellow-400'
+    }`}
+  >
+    {isPrikkrSending ? 'Opening...' : '📌 Prikkr your date!'}
+  </button>
+
+  <div className="mt-2 text-center w-[270px] sm:w-[300px] text-sm text-gray-800 leading-snug">
+  <div className="text-red-500 text-xl leading-none tracking-widest">
+    <span style={{ animation: 'bounce 1s infinite', animationDelay: '0s', display: 'inline-block' }}>⬆︎</span>{' '}
+    <span style={{ animation: 'bounce 1s infinite', animationDelay: '0.1s', display: 'inline-block' }}>⬆︎</span>{' '}
+    <span style={{ animation: 'bounce 1s infinite', animationDelay: '0.2s', display: 'inline-block' }}>⬆︎</span>{' '}
+    <span style={{ animation: 'bounce 1s infinite', animationDelay: '0.3s', display: 'inline-block' }}>⬆︎</span>{' '}
+    <span style={{ animation: 'bounce 1s infinite', animationDelay: '0.4s', display: 'inline-block' }}>⬆︎</span>
+  </div>
+  <p className="mt-1">
+    Pick a date once everyone has filled in their availability
+  </p>
+</div>
+</div>
+
+
 
 
           {showPopup && (
@@ -232,33 +327,73 @@ export default function ResultsPage() {
             </div>
           )}
 
-          {range && sortedDates.length > 0 && Object.keys(allSlots).length > 0 && sortedDates.map((date) => {
-            const slotsForDay = allSlots[date] || {};
+{range && sortedDates.length > 0 && Object.keys(allSlots).length > 0 && (
+  slotDuration?.toString() === '1440' ? (
+    Object.entries(groupDatesByWeek(sortedDates)).map(([weekLabel, datesInWeek]) => (
+      <div key={weekLabel} className="bg-white rounded-xl shadow-xl px-3 py-2 mb-6 w-full max-w-screen-xl mx-auto">
+        <h3 className="text-left font-semibold text-gray-500 mb-4 ml-1">{weekLabel}</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+          {datesInWeek.map(date => {
+            const count = Object.values(allSlots[date] || {}).reduce((acc, val) => acc + val, 0);
+            const percent = total > 0 ? Math.round((count / total) * 100) : 0;
+            let bgColor = "bg-red-800 text-white";
+            if (percent === 100) bgColor = "bg-green-600 text-white";
+            else if (percent >= 75) bgColor = "bg-yellow-400 text-white";
+            else if (percent >= 50) bgColor = "bg-orange-500 text-white";
+            else if (percent >= 25) bgColor = "bg-red-600 text-white";
+
             return (
-              <div key={date} className="bg-white rounded-xl shadow-md px-4 py-1 mb-2 w-full max-w-screen-xl mx-auto">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+              <div key={date} className={`rounded-xl p-4 text-sm sm:text-base font-medium text-center shadow-[0_8px_20px_rgba(0,0,0,0.25)] ${bgColor}`}>
+                <div className="text-xs text-gray-200 mb-1">{getWeekday(date)}</div>
+                <div className="font-bold">{formatDisplayDate(date)}</div>
+                <div className="text-xs mt-1">{percent}%</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    ))
+  ) : (
+    Object.entries(groupDatesByWeek(sortedDates)).map(([weekLabel, datesInWeek]) => (
+      <div key={weekLabel} className="bg-white rounded-2xl shadow-md px-3 py-2 mb-6 w-full max-w-screen-xl mx-auto">
+        <h3 className="text-left font-semibold text-gray-900 mb-4 ml-1">{weekLabel}</h3>
+        <div className="space-y-2">
+          {datesInWeek.map(date => {
+            const slotsForDay = allSlots[date] || {};
+            const mdCols = extendedHours ? 'md:grid-cols-7' : 'md:grid-cols-8';
+            const lgCols = extendedHours ? 'lg:grid-cols-7' : 'lg:grid-cols-8';
+
+            return (
+              <div key={date} className="bg-white rounded-xl shadow-md px-4 py-2 w-full">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 w-full">
                   <div className="text-left min-w-[10rem]">
                     <div className="text-sm text-gray-500 font-medium">{getWeekday(date)}</div>
                     <div className="text-base sm:text-lg font-semibold text-gray-900">{formatDisplayDate(date)}</div>
                   </div>
-                  <div className={`w-full grid gap-x-3 gap-y-1 ${extendedHours ? 'grid-cols-4 sm:grid-cols-7' : 'grid-cols-4 sm:grid-cols-8'}`}>
-                    {fullSlots.map((time) => {
+                  <div className={`grid w-full grid-cols-2 sm:grid-cols-4 ${mdCols} ${lgCols} gap-x-1 gap-y-0 sm:gap-x-1 sm:gap-y-1`}>
+                    {generateSlots().map((time) => {
                       const count = slotsForDay[time] || 0;
                       const percent = total > 0 ? Math.round((count / total) * 100) : 0;
-                      const [hourStr] = time.split(':');
-                      const endHour = `${String(parseInt(hourStr, 10) + 1).padStart(2, '0')}:00`;
+
+                      const [hh, mm] = time.split(':').map(Number);
+                      const start = DateTime.fromObject({ hour: hh, minute: mm });
+                      const end = start.plus({ minutes: durationInMinutes(slotDuration) });
+                      const label = `${start.toFormat('HH:mm')} - ${end.toFormat('HH:mm')}`;
+
                       let bgColor = "bg-red-800 text-white";
                       if (percent === 100) bgColor = "bg-green-600 text-white";
                       else if (percent >= 75) bgColor = "bg-yellow-400 text-white";
                       else if (percent >= 50) bgColor = "bg-orange-500 text-white";
                       else if (percent >= 25) bgColor = "bg-red-600 text-white";
+
                       return (
-                        <div
-                          key={time}
-                          className={`min-w-[87px] sm:min-w-0 px-3 py-2 text-[10px] sm:text-sm font-semibold text-center rounded-xl border border-gray-300 shadow-[0_8px_20px_rgba(0,0,0,0.25)] ${bgColor}`}
-                        >
-                          {time} - {endHour}<br />
-                          {percent}%
+                        <div key={time} className={`min-w-0 px-2 py-4 text-[10px] sm:text-sm font-semibold 
+                          rounded-xl border border-gray-300 shadow-[0_8px_20px_rgba(0,0,0,0.25)] 
+                          flex items-center justify-center text-center ${bgColor}`}>
+                          <div className="flex flex-col items-center leading-tight">
+                            <span>{label}</span>
+                            <span>{percent}%</span>
+                          </div>
                         </div>
                       );
                     })}
@@ -267,6 +402,14 @@ export default function ResultsPage() {
               </div>
             );
           })}
+        </div>
+      </div>
+    ))
+  )
+)}
+
+
+
 
           {results.length === 0 && (
             <p className="text-center text-gray-500 mt-8">No participants yet.</p>
@@ -289,6 +432,18 @@ export default function ResultsPage() {
           &copy; {new Date().getFullYear()} Prikkr. All rights reserved.
         </div>
       </footer>
+
+        <style jsx global>{`
+  @keyframes bounce {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+`}</style>
+
     </main>
   );
 }

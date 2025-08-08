@@ -14,10 +14,21 @@ export async function GET(req: NextRequest) {
     let deletedCount = 0;
 
     for (const metaKey of keys) {
-      const id = metaKey.split(':')[1]; // e.g. from meta:abc123 → abc123
-      const meta = await kv.get(metaKey) as { finalSelection?: { createdAt?: number } };
+      const id = metaKey.split(':')[1]; // from meta:abc123 → abc123
+      const metaRaw = await kv.get(metaKey);
 
-      const createdAt = meta?.finalSelection?.createdAt;
+      if (!metaRaw) continue;
+
+      let meta: any;
+      try {
+        meta = typeof metaRaw === 'string' ? JSON.parse(metaRaw) : metaRaw;
+      } catch (err) {
+        console.warn(`⚠️ Skipped malformed meta for ID ${id}`);
+        continue;
+      }
+
+      const createdAt = meta?.finalSelection?.createdAt || meta?.createdAt;
+
       if (!createdAt || typeof createdAt !== 'number') continue;
 
       const age = Date.now() - createdAt;

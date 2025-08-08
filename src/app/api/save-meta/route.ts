@@ -47,7 +47,7 @@ async function sendResultsEmail(to: string, name: string, eventName: string, id:
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, range, extendedHours, creatorEmail, creatorName, eventName } = body;
+    const { id, range, extendedHours, slotDuration, creatorEmail, creatorName, eventName } = body;
 
     console.log('🆔 Received ID:', id);
     console.log('📩 Email:', creatorEmail);
@@ -58,7 +58,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const data = { range, extendedHours, creatorEmail, creatorName, eventName, createdAt: Date.now() };
+    const data = {
+      range,
+      extendedHours,
+      slotDuration,
+      creatorEmail,
+      creatorName,
+      eventName,
+      createdAt: Date.now()  // 🕒 Add timestamp for auto-deletion
+    };
+
     const redisKey = `meta:${id}`;
     const redisValue = JSON.stringify(data);
 

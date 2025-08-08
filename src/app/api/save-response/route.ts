@@ -33,18 +33,25 @@ export async function POST(req: NextRequest) {
 
     await kv.set(redisKey, existingData);
 
+    // 🔎 Retrieve meta to send email confirmation if applicable
     let eventMeta: { eventName: string; creatorName: string; creatorEmail?: string } | undefined;
     const metaRaw = await kv.get(`meta:${id}`);
     if (!metaRaw) {
       console.error('❌ Failed to retrieve metadata for ID:', id);
     } else {
-      eventMeta = metaRaw as typeof eventMeta;
+      try {
+        // Handle stringified or object formats
+        eventMeta = typeof metaRaw === 'string' ? JSON.parse(metaRaw) : metaRaw as typeof eventMeta;
+      } catch (e) {
+        console.error('❌ Error parsing metaRaw:', e);
+      }
     }
 
     if (
       eventMeta?.eventName &&
       eventMeta?.creatorName &&
-      eventMeta?.creatorEmail !== email
+      eventMeta?.creatorEmail &&
+      eventMeta.creatorEmail !== email
     ) {
       await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-rsvp-confirmation`, {
         method: 'POST',
