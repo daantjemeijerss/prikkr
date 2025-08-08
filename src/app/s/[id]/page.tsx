@@ -1,8 +1,48 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useEffect, useState, useMemo } from 'react';
+
+// utils/fetchOutlookBusy.ts
+import { DateTime } from 'luxon';
+
+export async function fetchOutlookBusy(from: string, to: string, accessToken: string) {
+  const url = `https://graph.microsoft.com/v1.0/me/calendarView?startDateTime=${from}T00:00:00Z&endDateTime=${to}T23:59:59Z`;
+
+  try {
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Prefer: 'outlook.timezone="W. Europe Standard Time"',
+      },
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('❌ Outlook API error:', res.status, errorText);
+      return [];
+    }
+
+    const data = await res.json();
+
+    const busy = (data.value || []).map((item: any) => {
+      const start = DateTime.fromISO(item.start.dateTime, { zone: 'utc' }).setZone('Europe/Amsterdam');
+      const end = DateTime.fromISO(item.end.dateTime, { zone: 'utc' }).setZone('Europe/Amsterdam');
+      return {
+        start: start.toISO(),
+        end: end.toISO(),
+      };
+    });
+
+    console.log('📅 Busy slots received (Outlook):', busy);
+    return busy;
+
+  } catch (err) {
+    console.error('❌ Error fetching from Outlook:', err);
+    return [];
+  }
+}
 
 interface TimeSlot {
   start: string;
@@ -34,14 +74,110 @@ function formatDisplayDate(dateStr: string): string {
   });
 }
 
-function isSlotBusy(slotTime: string, date: string, busySlots: TimeSlot[]): boolean {
-  const slotStart = new Date(`${date}T${slotTime}:00`);
-  const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000);
-  return busySlots.some(({ start, end }) => {
-    const busyStart = new Date(start);
-    const busyEnd = new Date(end);
+function getSlotBusySegments(
+  slotTime: string,
+  date: string,
+  busySlots: TimeSlot[],
+  slotDurationMinutes: number
+): { from: number; to: number; color: string }[] {
+  const [hour, minute] = slotTime.split(':').map(Number);
+  const slotStart = DateTime.fromObject(
+    {
+      year: Number(date.split('-')[0]),
+      month: Number(date.split('-')[1]),
+      day: Number(date.split('-')[2]),
+      hour,
+      minute,
+    },
+    { zone: 'Europe/Amsterdam' }
+  );
+  const slotEnd = slotStart.plus({ minutes: slotDurationMinutes });
+
+  const total = slotEnd.diff(slotStart, 'minutes').minutes;
+
+  const segments: { from: number; to: number; color: string }[] = [];
+
+  // Start with fully green
+  let cursor = 0;
+
+  // Sort overlapping busy blocks
+  const overlapping = busySlots
+    .map(({ start, end }) => {
+      const busyStart = DateTime.fromISO(start);
+      const busyEnd = DateTime.fromISO(end);
+      return { busyStart, busyEnd };
+    })
+    .filter(({ busyStart, busyEnd }) => busyStart < slotEnd && busyEnd > slotStart)
+    .map(({ busyStart, busyEnd }) => ({
+      start: Math.max(0, busyStart.diff(slotStart, 'minutes').minutes),
+      end: Math.min(total, busyEnd.diff(slotStart, 'minutes').minutes),
+    }))
+    .sort((a, b) => a.start - b.start);
+
+  for (const { start, end } of overlapping) {
+    if (start > cursor) {
+      segments.push({
+        from: cursor / total,
+        to: start / total,
+        color: '#22c55e', // green
+      });
+    }
+    segments.push({
+      from: start / total,
+      to: end / total,
+      color: '#ef4444', // red
+    });
+    cursor = end;
+  }
+
+  if (cursor < total) {
+    segments.push({
+      from: cursor / total,
+      to: 1,
+      color: '#22c55e', // green
+    });
+  }
+
+  return segments;
+}
+
+function isSlotBusy(
+  slotTime: string,
+  date: string,
+  busySlots: TimeSlot[],
+  slotDurationMinutes: number
+): boolean {
+  const [hour, minute] = slotTime.split(':').map(Number);
+
+  const slotStart = DateTime.fromObject(
+    {
+      year: Number(date.split('-')[0]),
+      month: Number(date.split('-')[1]),
+      day: Number(date.split('-')[2]),
+      hour,
+      minute,
+    },
+    { zone: 'Europe/Amsterdam' }
+  );
+
+  const slotEnd = slotStart.plus({ minutes: slotDurationMinutes });
+
+  const overlapping = busySlots.filter(({ start, end }) => {
+    const busyStart = DateTime.fromISO(start);
+    const busyEnd = DateTime.fromISO(end);
     return busyStart < slotEnd && busyEnd > slotStart;
   });
+
+  if (overlapping.length > 0) {
+    console.log(`❌ SLOT BUSY: ${date} ${slotTime} (${slotDurationMinutes} min)`, {
+      slotStart: slotStart.toISO(),
+      slotEnd: slotEnd.toISO(),
+      overlapping,
+    });
+    return true;
+  }
+
+  return false;
 }
 
 export default function PrikkrPage() {
@@ -51,9 +187,28 @@ export default function PrikkrPage() {
   const [busySlots, setBusySlots] = useState<TimeSlot[]>([]);
   const [range, setRange] = useState<{ from: string; to: string } | null>(null);
   const [extendedHours, setExtendedHours] = useState(false);
+  const [slotDuration, setSlotDuration] = useState<string>('hourly');
   const [customMode, setCustomMode] = useState(false);
   const [manualSelections, setManualSelections] = useState<Record<string, Set<string>>>({});
   const [isSending, setIsSending] = useState(false);
+
+  const getSlotTypeLabel = (duration: string | number): string => {
+    const num = parseInt(String(duration));
+  switch (num) {
+      case 1440:
+        return 'daily';
+      case 60:
+        return 'hourly';
+      case 30:
+        return 'half-hour';
+      case 15:
+        return 'quarter-hour';
+      case 10:
+        return '10-minutes';
+      default:
+        return 'custom';
+    }
+  };
 
   useEffect(() => {
     const id = params?.id;
@@ -61,19 +216,31 @@ export default function PrikkrPage() {
 
     fetch(`/api/get-meta?id=${id}`)
       .then(res => res.json())
-      .then(({ range, extendedHours }) => {
-        setRange(range);
-        setExtendedHours(extendedHours);
+      .then(meta => {
+        console.log('📦 Loaded meta:', meta);
+        setRange(meta.range);
+        setExtendedHours(meta.extendedHours);
+
+        const duration = String(meta.slotDuration || '60');
+        setSlotDuration(duration);
+              console.log('⏱️ meta.slotDuration:', meta.slotDuration);
+      console.log('🆔 meta.slotType:', meta.slotType);
       });
   }, [params]);
 
-  useEffect(() => {
-    if (!range || !session?.accessToken) return;
+  const slotType = useMemo(() => getSlotTypeLabel(slotDuration), [slotDuration]);
+  const durationMinutes = parseInt(slotDuration === 'custom' ? '60' : slotDuration);
 
-    fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
+useEffect(() => {
+  if (!range || !session?.accessToken || !session.provider) return;
+
+  const accessToken = session.accessToken; // Type is now narrowed to string
+
+  const fetchGoogleBusy = async () => {
+    const res = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${session.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -81,17 +248,46 @@ export default function PrikkrPage() {
         timeMax: `${range.to}T23:59:59.999Z`,
         items: [{ id: 'primary' }],
       }),
-    })
-      .then(res => res.json())
-      .then(data => {
-        setBusySlots(data.calendars?.primary?.busy || []);
-      });
-  }, [range, session]);
+    });
+    const data = await res.json();
+    console.log('📅 Busy slots received (Google):', data.calendars?.primary?.busy);
+    setBusySlots(data.calendars?.primary?.busy || []);
+  };
 
-  const fullSlots = Array.from({ length: (extendedHours ? 23 : 17) - 9 }, (_, i) =>
-    `${String(9 + i).padStart(2, '0')}:00`
-  );
+  const fetchOutlookBusyInner = async () => {
+    const busy = await fetchOutlookBusy(range.from, range.to, accessToken); // ✅ No more error
+    setBusySlots(busy);
+    console.log('✅ Busy time slots stored in state:', busy);
+  };
 
+  if (session.provider === 'google') {
+    fetchGoogleBusy();
+  } else if (session.provider === 'azure-ad') {
+    fetchOutlookBusyInner();
+  }
+}, [range, session]);
+
+  const generateSlots = () => {
+    if (slotDuration === 'daily' || slotDuration === '1440') return ['All Day'];
+
+
+    const step = parseInt(String(slotDuration)); // always use actual numeric value
+
+    const slots: string[] = [];
+    const startHour = 9;
+    const endHour = extendedHours ? 21 : 17;
+
+    for (let h = startHour; h < endHour; h++) {
+      for (let m = 0; m < 60; m += step) {
+        const hh = String(h).padStart(2, '0');
+        const mm = String(m).padStart(2, '0');
+        slots.push(`${hh}:${mm}`);
+      }
+    }
+    return slots;
+  };
+
+  const fullSlots = generateSlots();
   const dates = range ? getDateRange(range.from, range.to) : [];
 
   const handleSlotToggle = (date: string, time: string) => {
@@ -127,9 +323,40 @@ export default function PrikkrPage() {
     } else {
       const computed: Record<string, string[]> = {};
       for (const date of dates) {
-        const availableSlots = session?.accessToken
-          ? fullSlots.filter(time => !isSlotBusy(time, date, busySlots))
-          : fullSlots;
+        const availableSlots: string[] = [];
+
+for (const time of fullSlots) {
+  if (time === 'All Day') {
+    const dayStart = DateTime.fromISO(date + 'T00:00:00', { zone: 'Europe/Amsterdam' });
+    const dayEnd = dayStart.plus({ days: 1 });
+    const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
+
+    const busyDur = busySlots
+      .map(({ start, end }) => {
+        const busyStart = DateTime.fromISO(start);
+        const busyEnd = DateTime.fromISO(end);
+        return {
+          start: Math.max(0, busyStart.diff(dayStart, 'minutes').minutes),
+          end: Math.min(totalMinutes, busyEnd.diff(dayStart, 'minutes').minutes),
+        };
+      })
+      .filter(({ start, end }) => start < end)
+      .reduce((sum, b) => sum + (b.end - b.start), 0);
+
+    const freeRatio = 1 - busyDur / totalMinutes;
+
+    if (freeRatio >= 1) {
+      availableSlots.push('All Day');
+    } else if (freeRatio >= 0.8) {
+      availableSlots.push('~All Day'); // special maybe marker
+    }
+  } else {
+    const isBusy = isSlotBusy(time, date, busySlots, durationMinutes);
+    if (!isBusy) {
+      availableSlots.push(time);
+    }
+  }
+}
 
         if (availableSlots.length > 0) {
           computed[date] = availableSlots;
@@ -159,7 +386,7 @@ export default function PrikkrPage() {
     }
   };
 
-  return (
+    return (
     <main className="relative flex flex-col min-h-screen bg-white text-gray-900">
       <img
         src="/images/prikkr_logo_transparent.png"
@@ -175,115 +402,338 @@ export default function PrikkrPage() {
           </h1>
 
           {range && (
-            <p className="text-base sm:text-lg text-gray-800 mb-8">
-              Select your availability between{' '}
-              <strong>{formatDisplayDate(range.from)}</strong> and{' '}
-              <strong>{formatDisplayDate(range.to)}</strong>
-            </p>
+            <p className="text-center text-sm sm:text-base font-medium text-gray-800">
+  Select your availability between
+  <span className="inline sm:hidden"><br /></span>
+  <strong> 05 Aug 2025 </strong> and <strong> 26 Aug 2025 </strong>
+</p>
+
           )}
 
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-4 sm:gap-8 mb-10">
-            <label className="flex items-center gap-x-2 gap-y-1 text-base sm:text-lg">
-              <input type="radio" checked={!customMode} onChange={() => setCustomMode(false)} />
-              <span>Use current availability</span>
-            </label>
-            <label className="flex items-center gap-x-2 gap-y-1 text-base sm:text-lg">
-              <input type="radio" checked={customMode} onChange={() => setCustomMode(true)} />
-              <span>Manually select times</span>
-            </label>
+<div className="mt-2 flex flex-row flex-wrap justify-center items-center gap-x-4 gap-y-2 mb-10">
+  <label className="flex items-center gap-x-2 text-md sm:text-lg">
+    <input type="radio" checked={!customMode} onChange={() => setCustomMode(false)} />
+    <span>Use current availability</span>
+  </label>
+  <label className="flex items-center gap-x-2 text-md sm:text-lg">
+    <input type="radio" checked={customMode} onChange={() => setCustomMode(true)} />
+    <span>Manually select times</span>
+  </label>
+</div>
+
+
+{(slotDuration === 'daily' || slotDuration === '1440') ? (
+  Object.entries(
+    dates.reduce((acc: Record<string, string[]>, dateStr: string) => {
+      const date = DateTime.fromISO(dateStr);
+      const weekStart = date.startOf('week').toISODate()!;
+      if (!acc[weekStart]) acc[weekStart] = [];
+      acc[weekStart].push(dateStr);
+      return acc;
+    }, {})
+  ).map(([weekStartStr, weekDates], weekIdx) => {
+    const startDate = DateTime.fromISO(weekStartStr);
+    const endDate = startDate.plus({ days: 6 });
+
+    return (
+      <div
+        key={`week-${weekIdx}`}
+        className="bg-white rounded-xl shadow-md px-2 py-1 mb-2 w-full max-w-screen-xl mx-auto"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-start gap-4 w-full">
+          {/* Week label */}
+          <div className="sm:w-[10rem] text-md text-left">
+            <div className="font-bold text-gray-800">Week {startDate.weekNumber}</div>
+            <div className="text-gray-600">
+              {startDate.toFormat('dd LLL')} – {endDate.toFormat('dd LLL')}
+            </div>
           </div>
 
-          {dates.map(date => (
-            <div
-              key={date}
-              className="bg-white rounded-xl shadow-md px-4 py-1 mb-2 w-full max-w-screen-xl mx-auto"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 w-full">
-                <div className="text-left sm:min-w-[10rem]">
-                  <div className="text-sm text-gray-500 font-medium">{getWeekday(date)}</div>
-                  <div className="text-base sm:text-lg font-semibold text-gray-900">
-                    {formatDisplayDate(date)}
-                  </div>
-                </div>
+          {/* Grid of 7 buttons */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2 flex-grow">
+            {weekDates.map(date => {
+              const isSelected = manualSelections[date]?.has('All Day');
 
-                <div
-                className={`w-full grid gap-x-3 gap-y-1 ${
-                  extendedHours
-                  ? 'grid-cols-4 sm:grid-cols-7'
-                  : 'grid-cols-4 sm:grid-cols-8'
-                  }`}
-                >
+              const dayStart = DateTime.fromISO(date + 'T00:00:00', { zone: 'Europe/Amsterdam' });
+              const dayEnd = dayStart.plus({ days: 1 });
+              const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
 
-                  {fullSlots.map(time => {
-                    const busy = isSlotBusy(time, date, busySlots);
-                    const isSelected = manualSelections[date]?.has(time);
-                    const showGreen = !customMode && !busy;
-                    const showRed = !customMode && busy;
-                    const endTime = `${String(Number(time.split(':')[0]) + 1).padStart(2, '0')}:00`;
+              const overlappingBusy = busySlots
+                .map(({ start, end }) => {
+                  const busyStart = DateTime.fromISO(start);
+                  const busyEnd = DateTime.fromISO(end);
+                  return {
+                    start: Math.max(0, busyStart.diff(dayStart, 'minutes').minutes),
+                    end: Math.min(totalMinutes, busyEnd.diff(dayStart, 'minutes').minutes),
+                  };
+                })
+                .filter(({ start, end }) => start < end);
 
-                    return (
-                      <button
-                        key={time}
-                        onClick={() => customMode && handleSlotToggle(date, time)}
-                        className={`min-w-[87px] sm:min-w-0 px-3 py-3 text-[10px] sm:text-sm font-semibold text-center rounded-xl w-full transition-all duration-100 shadow-[0_4px_10px_rgba(0,0,0,0.25)] border
-                          ${
-                            customMode
-                              ? isSelected
-                                ? 'bg-green-500 text-white'
-                                : 'bg-white text-gray-800 hover:bg-gray-100'
-                              : showGreen
-                              ? 'bg-green-500 text-white'
-                              : showRed
-                              ? 'bg-red-500 text-white'
-                              : 'bg-white text-gray-800 hover:bg-gray-100'
-                          }`}
-                      >
-                        {time} - {endTime}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              const busyDuration = overlappingBusy.reduce((sum, b) => sum + (b.end - b.start), 0);
+              const freeRatio = 1 - busyDuration / totalMinutes;
 
-              {customMode && (
-                <div className="mt-2 flex justify-center w-full">
+              const isFullyFree = freeRatio === 1;
+              const isMostlyFree = freeRatio >= 0.8;
+
+              const dateLabel = DateTime.fromISO(date).toFormat('ccc dd LLL');
+
+              const baseClass =
+                "w-full px-2 py-4 text-sm font-semibold text-center rounded-xl transition-all duration-100 shadow-[0_8px_20px_rgba(0,0,0,0.25)] border";
+
+              if (customMode) {
+                const bg =
+                  isFullyFree
+                    ? "bg-green-100 hover:bg-green-200 text-gray-800"
+                    : isMostlyFree
+                    ? "bg-yellow-100 hover:bg-yellow-200 text-gray-800"
+                    : "bg-red-100 hover:bg-red-200 text-gray-800";
+
+                return (
                   <button
-                    onClick={() => handleDayToggle(date)}
-                    className="text-blue-600 text-sm underline"
+                    key={date}
+                    onClick={() => handleSlotToggle(date, 'All Day')}
+                    className={`${baseClass} ${isSelected ? 'bg-green-500 text-white' : bg}`}
                   >
-                    {manualSelections[date]?.size === fullSlots.length ? 'Unselect all' : 'Select all'}
+                    {dateLabel}
                   </button>
-                </div>
-              )}
-            </div>
-          ))}
+                );
+              } else {
+                const bg =
+                  isFullyFree
+                    ? "bg-green-500"
+                    : isMostlyFree
+                    ? "bg-yellow-400"
+                    : "bg-red-500";
+
+                const icon = isFullyFree ? '✔' : isMostlyFree ? '~' : '✘';
+
+                return (
+                  <div
+                    key={date}
+                    className={`${baseClass} ${bg} text-white`}
+                  >
+                    <span className="flex items-center justify-center gap-1">
+                      {dateLabel}
+                      <span className={`inline-block ml-1 text-base ${icon === '✘' ? '' : 'animate-bounce'}`}>
+                        {icon}
+                      </span>
+                    </span>
+                  </div>
+                );
+              }
+            })}
+          </div>
+        </div>
+
+        {customMode && (
+          <div className="mt-2 flex justify-center w-full">
+            <button
+              onClick={() => {
+                const allSelected = weekDates.every(date => manualSelections[date]?.has('All Day'));
+                setManualSelections(prev => {
+                  const updated = { ...prev };
+                  for (const date of weekDates) {
+                    updated[date] = new Set(allSelected ? [] : ['All Day']);
+                  }
+                  return updated;
+                });
+              }}
+              className="text-blue-600 text-sm underline"
+            >
+              {weekDates.every(date => manualSelections[date]?.has('All Day'))
+                ? 'Unselect all'
+                : 'Select all'}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  })
+) : (
+
+  // everything else remains untouched for other slot durations
+  dates.map(date => (
+    <div
+      key={date}
+      className="bg-white rounded-xl shadow-md px-4 py-1 mb-2 w-full max-w-screen-xl mx-auto"
+    >
+       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 w-full">
+        <div className="text-left sm:min-w-[10rem] pt-1 self-start">
+          <div className="text-sm text-gray-500 font-medium">{getWeekday(date)}</div>
+          <div className="text-base sm:text-lg font-semibold text-gray-900">
+            {formatDisplayDate(date)}
+          </div>
+        </div>
+
+        <div
+className={`w-full grid gap-x-2 gap-y-2 auto-rows-fr ${
+  slotType === 'hourly'
+    ? extendedHours
+      ? 'grid-cols-3 sm:grid-cols-6'
+      : 'grid-cols-3 sm:grid-cols-4 sm:grid-cols-8'
+    : slotType === 'quarter-hour'
+    ? 'grid-cols-3 sm:grid-cols-6 sm:grid-cols-8'
+    : slotType === 'half-hour'
+    ? 'grid-cols-3 sm:grid-cols-5 sm:grid-cols-6'
+    : slotType === '10-minutes'
+    ? 'grid-cols-3 sm:grid-cols-4 sm:grid-cols-6'
+    : 'grid-cols-3 sm:grid-cols-4 sm:grid-cols-6'
+}`}
+>
+          {fullSlots.map(time => {
+            const isSelected = manualSelections[date]?.has(time);
+            const [startH, startM] = time.split(':').map(Number);
+            const step = parseInt(String(slotDuration)); // Always correct, even for 5, 7, etc.
+            const end = new Date(0, 0, 0, startH, startM + step);
+            const endTime = end.toTimeString().slice(0, 5);
+
+            if (customMode) {
+  const segments = getSlotBusySegments(time, date, busySlots, durationMinutes);
+
+  const backgroundGradient = segments.length
+    ? `linear-gradient(to right, ${segments
+        .map(s => `${s.color}33 ${s.from * 100}% ${s.to * 100}%`) // '33' adds ~20% opacity
+        .join(', ')})`
+    : undefined;
+
+  return (
+  <button
+    key={time}
+    onClick={() => handleSlotToggle(date, time)}
+    className={`px-3 py-2 h-[44px] text-[10px] sm:text-sm font-semibold text-center rounded-xl transition-all duration-100 shadow-[0_4px_10px_rgba(0,0,0,0.25)] border ${
+  isSelected
+    ? 'bg-green-500 text-white'
+    : 'text-gray-800 hover:bg-gray-100'
+}`}
+    style={{
+      background: isSelected ? undefined : backgroundGradient,
+    }}
+  >
+    <div className="flex items-center justify-center gap-1">
+      <span
+  className={`whitespace-nowrap ${
+    durationMinutes <= 10 ? 'text-[11px] sm:text-sm' : 'text-sm sm:text-base'
+  }`}
+>
+  {`${time} - ${endTime}`}
+</span>
+      {isSelected && (
+        <span className="text-white text-xs float-check">✔</span>
+      )}
+    </div>
+  </button>
+);
+}
+
+
+            const segments = getSlotBusySegments(time, date, busySlots, durationMinutes);
+            const gradientStyle = segments.length
+              ? {
+                  background: `linear-gradient(to right, ${segments
+                    .map(s => `${s.color} ${s.from * 100}% ${s.to * 100}%`)
+                    .join(', ')})`,
+                  color: '#fff',
+                }
+              : {};
+
+              const isFullyGreen =
+  segments.length === 1 &&
+  segments[0].color === '#22c55e' &&
+  segments[0].from === 0 &&
+  segments[0].to === 1;
+
+  const hasRed = segments.some(s => s.color === '#ef4444');
+return (
+  <button
+    key={time}
+    className="min-w-[87px] sm:min-w-0 px-3 py-4 text-[10px] sm:text-sm font-semibold text-center rounded-xl w-full transition-all duration-100 shadow-[0_4px_10px_rgba(0,0,0,0.25)] border"
+    style={gradientStyle}
+  >
+    <div className="flex items-center justify-center gap-1">
+      <span>{`${time} - ${endTime}`}</span>
+      {isFullyGreen ? (
+        <span className="text-white text-xs float-check">✔</span>
+      ) : hasRed ? (
+        <span className="text-white text-xs">✘</span>
+      ) : null}
+    </div>
+  </button>
+);
+          })}
+        </div>
+      </div>
+
+      {customMode && (
+        <div className="mt-2 flex justify-center w-full">
+          <button
+            onClick={() => handleDayToggle(date)}
+            className="text-blue-600 text-sm underline"
+          >
+            {manualSelections[date]?.size === fullSlots.length
+              ? 'Unselect all'
+              : 'Select all'}
+          </button>
+        </div>
+      )}
+    </div>
+  ))
+)}
+
 
           <button
             onClick={handleSendOut}
             disabled={isSending}
-            className={`mt-6 px-6 py-3 text-base sm:text-lg font-semibold rounded-xl transition-all duration-150 transform hover:scale-105 shadow-[0_8px_20px_rgba(0,0,0,0.25)] bg-green-600 text-white hover:bg-green-700 border border-green-500 ${isSending ? 'opacity-70 cursor-not-allowed' : ''}`}
+            className={`mt-6 px-6 py-3 text-base sm:text-lg font-semibold rounded-xl transition-all duration-150 transform hover:scale-105 shadow-[0_8px_20px_rgba(0,0,0,0.25)] bg-green-600 text-white hover:bg-green-700 border border-green-500 ${
+              isSending ? 'opacity-70 cursor-not-allowed' : ''
+            }`}
           >
             {isSending ? 'Sending...' : 'Send out!'}
           </button>
         </div>
       </section>
 
-            {/* Footer */}
+      {/* Footer */}
       <footer className="w-full bg-gray-100 py-6 px-4 text-center text-sm text-gray-600">
         <div className="mb-1 font-semibold text-gray-800 text-base">📌Prikkr</div>
         <div className="mb-3 italic text-gray-600 text-sm">"The smart way to plan together."</div>
         <div className="mb-2">Office: Utrecht, Netherlands</div>
 
         <div className="flex justify-center gap-4 text-blue-600 text-sm mt-2">
-          <button onClick={() => router.push('/contact')} className="hover:underline">Contact</button>
-          <button onClick={() => router.push('/privacy-policy')} className="hover:underline">Privacy Policy</button>
-          <button onClick={() => router.push('/terms')} className="hover:underline">Terms of Service</button>
+          <button onClick={() => router.push('/contact')} className="hover:underline">
+            Contact
+          </button>
+          <button onClick={() => router.push('/privacy-policy')} className="hover:underline">
+            Privacy Policy
+          </button>
+          <button onClick={() => router.push('/terms')} className="hover:underline">
+            Terms of Service
+          </button>
         </div>
 
         <div className="mt-4 text-xs text-gray-400">
           &copy; {new Date().getFullYear()} Prikkr. All rights reserved.
         </div>
       </footer>
+
+      <style jsx>{`
+  .float-check {
+    animation: floatCheck 1.5s ease-in-out infinite;
+    display: inline-block;
+  }
+
+  @keyframes floatCheck {
+    0% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-2px);
+    }
+    100% {
+      transform: translateY(0);
+    }
+  }
+`}</style>
+
     </main>
   );
 }

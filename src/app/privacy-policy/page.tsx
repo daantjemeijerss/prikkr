@@ -65,6 +65,34 @@ export default function PrivacyPolicyPage() {
           <p className="mt-6 text-base sm:text-lg text-gray-800">
             We never sell your data or share it with third parties, and we only store what's necessary to support group scheduling.
           </p>
+
+          <h2 className="text-2xl sm:text-3xl font-semibold mt-10 mb-4 pt-4 border-t border-gray-200">
+            How We Protect Your Data
+          </h2>
+
+          <p className="mb-4 text-base sm:text-lg text-gray-800">
+            All data is transmitted securely over encrypted HTTPS connections. Any data retrieved from your Google account (such as your name, email, and calendar free/busy status) is used only during your session to generate availability for group scheduling.
+          </p>
+
+          <p className="mb-4 text-base sm:text-lg text-gray-800">
+            We do not store Google Calendar data on our servers unless explicitly required to show group availability. When stored, data is kept in secure, access-controlled infrastructure managed by Vercel. We do not retain calendar event details, and calendar free/busy data is only accessed temporarily during session time and not stored.
+          </p>
+
+          <h2 className="text-2xl sm:text-3xl font-semibold mt-10 mb-4 pt-4 border-t border-gray-200">
+            Data Retention & Deletion
+          </h2>
+
+          <p className="mb-4 text-base sm:text-lg text-gray-800">
+            We retain planning-related data — such as event names, selected date ranges, participant names, emails, and availability responses — for up to <strong>1 year</strong> after the event is created. This matches the validity period of the scheduling link.
+          </p>
+
+          <p className="mb-4 text-base sm:text-lg text-gray-800">
+            After 1 year, all associated data is <strong>automatically deleted</strong> from our servers without requiring user action.
+          </p>
+
+          <p className="mb-4 text-base sm:text-lg text-gray-800">
+            If you wish to delete your data earlier, you may request manual deletion by contacting us at <a href="mailto:prikkrgroupplanner@gmail.com" className="text-blue-600 underline">prikkrgroupplanner@gmail.com</a>. We will process your request promptly.
+          </p>
         </div>
       </section>
 

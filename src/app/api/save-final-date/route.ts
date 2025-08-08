@@ -16,7 +16,9 @@ export async function POST(req: NextRequest) {
     }
 
     const meta = raw as Record<string, any>;
-    meta.finalSelection = { date, time };
+
+    const now = Date.now(); // 🕒 Timestamp for deletion tracking
+    meta.finalSelection = { date, time, createdAt: now };
 
     await kv.set(`meta:${id}`, meta);
 
