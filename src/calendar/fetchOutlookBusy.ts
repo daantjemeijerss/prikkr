@@ -25,14 +25,11 @@ export async function fetchOutlookBusy(
 
     const data = await res.json();
 
-    return (data.value || []).map((item: any) => ({
-      start: DateTime.fromISO(item.start.dateTime, { zone: 'utc' })
-        .setZone('Europe/Amsterdam')
-        .toISO(),
-      end: DateTime.fromISO(item.end.dateTime, { zone: 'utc' })
-        .setZone('Europe/Amsterdam')
-        .toISO(),
-    }));
+   return (data.value || []).map((item: any) => ({
+  start: DateTime.fromISO(item.start.dateTime, { zone: 'Europe/Amsterdam' }).toISO(),
+  end:   DateTime.fromISO(item.end.dateTime,   { zone: 'Europe/Amsterdam' }).toISO(),
+}));
+
   } catch (err) {
     console.error('❌ Error fetching from Outlook:', err);
     return [];

@@ -29,26 +29,75 @@ AzureADProvider({
 
 callbacks: {
   async jwt({ token, account }) {
-    if (typeof account?.access_token === 'string') {
-      token.accessToken = account.access_token;
+    // On initial sign-in, stash provider + tokens + expiry
+    if (account) {
+      if (account.provider === 'google' || account.provider === 'azure-ad') {
+        token.provider = account.provider; // ✅ union-safe
+      }
+      if (typeof account.access_token === 'string') {
+        token.accessToken = account.access_token;
+      }
+      if (typeof account.refresh_token === 'string') {
+        token.refreshToken = account.refresh_token;
+      }
+      if (typeof account.expires_in === 'number') {
+        token.expiresAt = Date.now() + account.expires_in * 1000;
+      }
     }
-    const p = account?.provider;
-    if (p === 'google' || p === 'azure-ad') {
-      token.provider = p;
+
+    // 🔁 REFRESH BLOCK — keep this inside jwt(), after the sign-in section and before 'return token'
+    if (
+      token.provider === 'azure-ad' &&
+      typeof token.expiresAt === 'number' &&
+      Date.now() > token.expiresAt - 60_000 &&
+      typeof token.refreshToken === 'string' &&
+      token.refreshToken.length > 0
+    ) {
+      try {
+        const body = new URLSearchParams({
+          client_id: process.env.AZURE_AD_CLIENT_ID!,
+          client_secret: process.env.AZURE_AD_CLIENT_SECRET!,
+          grant_type: 'refresh_token',
+          refresh_token: token.refreshToken, // guaranteed string by the guard
+          scope: 'openid profile email offline_access User.Read Calendars.Read',
+        });
+
+        const resp = await fetch(
+          `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/oauth2/v2.0/token`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body,
+          }
+        );
+
+        if (resp.ok) {
+          const data = await resp.json();
+          if (typeof data.access_token === 'string') token.accessToken = data.access_token;
+          if (typeof data.refresh_token === 'string') token.refreshToken = data.refresh_token;
+          if (typeof data.expires_in === 'number') token.expiresAt = Date.now() + data.expires_in * 1000;
+        } else {
+          console.error('🔁 Azure refresh failed:', resp.status, await resp.text());
+        }
+      } catch (e) {
+        console.error('🔁 Azure refresh error:', e);
+      }
     }
+
     return token;
   },
+
   async session({ session, token }) {
     if (typeof token.accessToken === 'string') {
-      session.accessToken = token.accessToken;
+      (session as any).accessToken = token.accessToken;
     }
-    const p = token.provider;
-    if (p === 'google' || p === 'azure-ad') {
-      session.provider = p;
+    if (token.provider === 'google' || token.provider === 'azure-ad') {
+      (session as any).provider = token.provider; // ✅ union-safe
     }
     return session;
   },
-}
+},
+
 
 
 });
