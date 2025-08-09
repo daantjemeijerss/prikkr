@@ -54,20 +54,23 @@ export default function PrikkrPage() {
 
 
 useEffect(() => {
-  if (!range || !session?.accessToken || !session.provider) return;
+  if (!range) return;
 
-  const loadBusySlots = async () => {
-    const accessToken = session.accessToken;
+  const token = session?.accessToken;
+  const provider = session?.provider;
 
-    const busy = session.provider === 'google'
-      ? await fetchGoogleBusy(range.from, range.to, accessToken)
-      : await fetchOutlookBusy(range.from, range.to, accessToken);
+  if (typeof token !== 'string') return;
+  if (provider !== 'google' && provider !== 'azure-ad') return;
 
+  (async () => {
+    const busy =
+      provider === 'google'
+        ? await fetchGoogleBusy(range.from, range.to, token)
+        : await fetchOutlookBusy(range.from, range.to, token);
     setBusySlots(busy);
-  };
+  })();
+}, [range, session?.accessToken, session?.provider]);
 
-  loadBusySlots();
-}, [range, session]);
 
   const generateSlots = () => {
     if (slotDuration === 'daily' || slotDuration === '1440') return ['All Day'];

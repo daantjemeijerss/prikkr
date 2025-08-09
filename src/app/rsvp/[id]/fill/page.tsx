@@ -53,20 +53,25 @@ export default function RSVPFillPage() {
   }, [params]);
 
 useEffect(() => {
-  if (!range || !session?.accessToken || !session.provider) return;
+  if (!range) return;
 
-  const loadBusySlots = async () => {
-    if (session.provider === 'google') {
-      const slots = await fetchGoogleBusy(range.from, range.to, session.accessToken);
+  const token = session?.accessToken;
+  const provider = session?.provider;
+
+  if (typeof token !== 'string') return;
+  if (provider !== 'google' && provider !== 'azure-ad') return;
+
+  (async () => {
+    if (provider === 'google') {
+      const slots = await fetchGoogleBusy(range.from, range.to, token);
       setBusySlots(slots);
-    } else if (session.provider === 'azure-ad') {
-      const slots = await fetchOutlookBusy(range.from, range.to, session.accessToken);
+    } else {
+      const slots = await fetchOutlookBusy(range.from, range.to, token);
       setBusySlots(slots);
     }
-  };
+  })();
+}, [range, session?.accessToken, session?.provider]);
 
-  loadBusySlots();
-}, [range, session]);
 
 
   const generateSlots = () => {

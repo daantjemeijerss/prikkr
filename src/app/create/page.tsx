@@ -223,9 +223,17 @@ for (let hour = startHour; hour < endHour; hour++) {
     key: 'selection'
   }]}
   onChange={(item) => {
-  setFrom(item.selection.startDate.toLocaleDateString('sv-SE')); // YYYY-MM-DD
-  setTo(item.selection.endDate.toLocaleDateString('sv-SE'));     // YYYY-MM-DD
+  const start = item?.selection?.startDate;
+  const end   = item?.selection?.endDate;
+
+  if (start instanceof Date) {
+    setFrom(start.toLocaleDateString('sv-SE')); // YYYY-MM-DD
+  }
+  if (end instanceof Date) {
+    setTo(end.toLocaleDateString('sv-SE'));
+  }
 }}
+
   moveRangeOnFirstSelection={false}
   rangeColors={['#16a34a']} // green-600
   className="rounded-xl shadow border mb-4"

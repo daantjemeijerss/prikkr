@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import AzureADProvider from 'next-auth/providers/azure-ad';
+import '@/types/next-auth';
 
 const handler = NextAuth({
   providers: [
@@ -27,21 +28,30 @@ AzureADProvider({
 
   ],
 
-  callbacks: {
-    async jwt({ token, account }) {
-      if (account) {
-        token.accessToken = account.access_token;
-        token.provider = account.provider;
-      }
-      return token;
-    },
-
-    async session({ session, token }) {
-      session.accessToken = (token as { accessToken?: string }).accessToken;
-      session.provider = (token as { provider?: string }).provider;
-      return session;
-    },
+callbacks: {
+  async jwt({ token, account }) {
+    if (typeof account?.access_token === 'string') {
+      token.accessToken = account.access_token;
+    }
+    const p = account?.provider;
+    if (p === 'google' || p === 'azure-ad') {
+      token.provider = p;
+    }
+    return token;
   },
+  async session({ session, token }) {
+    if (typeof token.accessToken === 'string') {
+      session.accessToken = token.accessToken;
+    }
+    const p = token.provider;
+    if (p === 'google' || p === 'azure-ad') {
+      session.provider = p;
+    }
+    return session;
+  },
+}
+
+
 });
 
 export { handler as GET, handler as POST };

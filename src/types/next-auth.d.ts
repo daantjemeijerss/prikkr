@@ -1,26 +1,17 @@
-// src/types/next-auth.d.ts
-import NextAuth from "next-auth";
+import 'next-auth';
 
-declare module "next-auth" {
+declare module 'next-auth' {
   interface Session {
-    user: {
-      name?: string | null;
-      email?: string | null;
-      image?: string | null;
-    };
-    accessToken: string;
-    provider: 'google' | 'azure-ad';
-  }
-
-  interface User {
-    accessToken: string;
-    provider: 'google' | 'azure-ad';
+    accessToken?: string;
+    provider?: string;
   }
 }
 
-declare module "next-auth/jwt" {
+declare module 'next-auth/jwt' {
   interface JWT {
-    accessToken: string;
-    provider: 'google' | 'azure-ad';
+    accessToken?: string;
+    provider?: string;
   }
 }
+
+export {};
