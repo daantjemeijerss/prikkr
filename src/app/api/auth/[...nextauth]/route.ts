@@ -1,11 +1,35 @@
-// app/api/auth/[...nextauth]/route.ts
 import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import AzureADProvider from 'next-auth/providers/azure-ad';
 
-// Optional: warn if a required env is missing (helps on Vercel Prod)
-['NEXTAUTH_URL', 'NEXTAUTH_SECRET', 'AZURE_AD_CLIENT_ID', 'AZURE_AD_CLIENT_SECRET', 'AZURE_AD_TENANT_ID', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET']
-  .forEach(k => { if (!process.env[k]) console.warn(`[env] Missing ${k}`); });
+// (Optional) Warn if something important is missing in the env (helps on Prod)
+[
+  'NEXTAUTH_URL',
+  'NEXTAUTH_SECRET',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  // AZURE vars can be missing locally if you only test Google; that's fine.
+  'AZURE_AD_CLIENT_ID',
+  'AZURE_AD_CLIENT_SECRET',
+].forEach((k) => {
+  if (!process.env[k]) console.warn(`[env] Missing ${k}`);
+});
+
+// Use 'consumers' by default for personal Microsoft accounts (Outlook/Live)
+const TENANT = process.env.AZURE_AD_TENANT_ID ?? 'consumers';
+
+// Fallback: derive expiry from access token if provider didn't pass expires_in
+function deriveExpiresAtFromAccessToken(at?: string) {
+  try {
+    if (!at) return undefined;
+    const [, payload] = at.split('.');
+    const claims = JSON.parse(Buffer.from(payload, 'base64').toString('utf8'));
+    if (typeof claims.exp === 'number') return claims.exp * 1000; // ms
+  } catch {
+    /* noop */
+  }
+  return undefined;
+}
 
 const handler = NextAuth({
   providers: [
@@ -22,11 +46,11 @@ const handler = NextAuth({
     AzureADProvider({
       clientId: process.env.AZURE_AD_CLIENT_ID!,
       clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
-      tenantId: process.env.AZURE_AD_TENANT_ID || 'common', // prefer real GUID in Prod
+      tenantId: TENANT, // <- critical for personal accounts
       authorization: {
         params: {
           scope: 'openid profile email offline_access User.Read Calendars.Read',
-          // If you need to force a fresh consent once on Prod, uncomment next line, deploy, sign in once, then remove again:
+          // If you need to force a fresh consent once on prod:
           // prompt: 'consent',
         },
       },
@@ -35,7 +59,7 @@ const handler = NextAuth({
 
   callbacks: {
     async jwt({ token, account }) {
-      // On first sign-in: stash provider + tokens + expiry
+      // On sign-in: stash provider, tokens and expiry
       if (account) {
         if (account.provider === 'google' || account.provider === 'azure-ad') {
           token.provider = account.provider;
@@ -44,13 +68,18 @@ const handler = NextAuth({
         if (typeof account.refresh_token === 'string') token.refreshToken = account.refresh_token;
         if (typeof account.expires_in === 'number') {
           token.expiresAt = Date.now() + account.expires_in * 1000;
+        } else if (!token.expiresAt && typeof account.access_token === 'string') {
+          token.expiresAt = deriveExpiresAtFromAccessToken(account.access_token);
         }
+      } else if (!token.expiresAt && typeof token.accessToken === 'string') {
+        // derive on subsequent runs if still missing
+        token.expiresAt = deriveExpiresAtFromAccessToken(token.accessToken);
       }
 
-      // Debug: see what we have at runtime on the server
+      // Debug breadcrumb (server-side; visible in Vercel function logs)
       console.log('🔁 Azure check:', { provider: token.provider, exp: token.expiresAt });
 
-      // Refresh Azure token if expiring (1 min early)
+      // Refresh Azure token if expiring soon
       if (
         token.provider === 'azure-ad' &&
         typeof token.expiresAt === 'number' &&
@@ -64,13 +93,12 @@ const handler = NextAuth({
             client_id: process.env.AZURE_AD_CLIENT_ID!,
             client_secret: process.env.AZURE_AD_CLIENT_SECRET!,
             grant_type: 'refresh_token',
-            refresh_token: token.refreshToken, // guaranteed string by guard above
+            refresh_token: token.refreshToken,
             scope: 'openid profile email offline_access User.Read Calendars.Read',
           });
 
-          const tenant = process.env.AZURE_AD_TENANT_ID || 'common';
           const resp = await fetch(
-            `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`,
+            `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/token`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -84,6 +112,8 @@ const handler = NextAuth({
             if (typeof data.refresh_token === 'string') token.refreshToken = data.refresh_token;
             if (typeof data.expires_in === 'number') {
               token.expiresAt = Date.now() + data.expires_in * 1000;
+            } else if (!token.expiresAt && typeof data.access_token === 'string') {
+              token.expiresAt = deriveExpiresAtFromAccessToken(data.access_token);
             }
           } else {
             console.error('🔁 Azure refresh failed:', resp.status, await resp.text());
