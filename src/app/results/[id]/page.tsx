@@ -78,7 +78,11 @@ export default function ResultsPage() {
 function generateSlots() {
   const slots: string[] = [];
   const increment = durationInMinutes(slotDuration);
-  for (let hour = 9; hour <= (extendedHours ? 22 : 17); hour++) {
+
+  const START_HOUR = 9;
+  const END_HOUR = extendedHours ? 21 : 17; // ⬅️ exclusive upper bound to match S page
+
+  for (let hour = START_HOUR; hour < END_HOUR; hour++) {
     for (let minute = 0; minute < 60; minute += increment) {
       const hh = String(hour).padStart(2, '0');
       const mm = String(minute).padStart(2, '0');
@@ -169,7 +173,11 @@ function generateSlots() {
     setBestTimeSlots(top);
   }
 
-  const fullSlots = Array.from({ length: (extendedHours ? 23 : 17) - 9 }, (_, i) => `${String(9 + i).padStart(2, "0")}:00`);
+  const fullSlots = Array.from(
+  { length: (extendedHours ? 21 : 17) - 9 },
+  (_, i) => `${String(9 + i).padStart(2, '0')}:00`
+);
+
 
   function getDateRange(from: string, to: string): string[] {
     const dates = [];
@@ -376,9 +384,10 @@ function groupWeekly(dates: string[]): string[][] {
                       const percent = total > 0 ? Math.round((count / total) * 100) : 0;
 
                       const [hh, mm] = time.split(':').map(Number);
-                      const start = DateTime.fromObject({ hour: hh, minute: mm });
-                      const end = start.plus({ minutes: durationInMinutes(slotDuration) });
-                      const label = `${start.toFormat('HH:mm')} - ${end.toFormat('HH:mm')}`;
+const start = DateTime.fromObject({ hour: hh, minute: mm }, { zone: 'Europe/Amsterdam' });
+const end = start.plus({ minutes: durationInMinutes(slotDuration) });
+const label = `${start.toFormat('HH:mm')} - ${end.toFormat('HH:mm')}`;
+
 
                       let bgColor = "bg-red-800 text-white";
                       if (percent === 100) bgColor = "bg-green-600 text-white";
