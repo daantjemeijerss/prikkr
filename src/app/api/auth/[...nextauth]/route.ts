@@ -46,6 +46,7 @@ callbacks: {
     }
 
     // 🔁 REFRESH BLOCK — keep this inside jwt(), after the sign-in section and before 'return token'
+     console.log('🔁 Azure check: provider=', token.provider, 'exp=', token.expiresAt);
     if (
       token.provider === 'azure-ad' &&
       typeof token.expiresAt === 'number' &&
@@ -53,6 +54,7 @@ callbacks: {
       typeof token.refreshToken === 'string' &&
       token.refreshToken.length > 0
     ) {
+      console.log('🔁 Attempting Azure token refresh…');
       try {
         const body = new URLSearchParams({
           client_id: process.env.AZURE_AD_CLIENT_ID!,
