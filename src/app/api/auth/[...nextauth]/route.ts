@@ -2,33 +2,18 @@ import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import AzureADProvider from 'next-auth/providers/azure-ad';
 
-// (Optional) Warn if something important is missing in the env (helps on Prod)
-[
-  'NEXTAUTH_URL',
-  'NEXTAUTH_SECRET',
-  'GOOGLE_CLIENT_ID',
-  'GOOGLE_CLIENT_SECRET',
-  // AZURE vars can be missing locally if you only test Google; that's fine.
-  'AZURE_AD_CLIENT_ID',
-  'AZURE_AD_CLIENT_SECRET',
-].forEach((k) => {
-  if (!process.env[k]) console.warn(`[env] Missing ${k}`);
-});
-
-// Use 'consumers' by default for personal Microsoft accounts (Outlook/Live)
+// Default to 'consumers' for personal Microsoft accounts (Outlook/Live).
+// Leave AZURE_AD_TENANT_ID unset in Prod unless you truly need an Entra tenant GUID.
 const TENANT = process.env.AZURE_AD_TENANT_ID ?? 'consumers';
 
-// Fallback: derive expiry from access token if provider didn't pass expires_in
+// Derive expiry from access token if the provider doesn't return expires_in.
 function deriveExpiresAtFromAccessToken(at?: string) {
   try {
-    if (!at) return undefined;
+    if (!at) return;
     const [, payload] = at.split('.');
     const claims = JSON.parse(Buffer.from(payload, 'base64').toString('utf8'));
     if (typeof claims.exp === 'number') return claims.exp * 1000; // ms
-  } catch {
-    /* noop */
-  }
-  return undefined;
+  } catch {}
 }
 
 const handler = NextAuth({
@@ -46,12 +31,10 @@ const handler = NextAuth({
     AzureADProvider({
       clientId: process.env.AZURE_AD_CLIENT_ID!,
       clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
-      tenantId: TENANT, // <- critical for personal accounts
+      tenantId: TENANT,
       authorization: {
         params: {
           scope: 'openid profile email offline_access User.Read Calendars.Read',
-          // If you need to force a fresh consent once on prod:
-          // prompt: 'consent',
         },
       },
     }),
@@ -59,7 +42,7 @@ const handler = NextAuth({
 
   callbacks: {
     async jwt({ token, account }) {
-      // On sign-in: stash provider, tokens and expiry
+      // On sign-in: capture provider, tokens, expiry
       if (account) {
         if (account.provider === 'google' || account.provider === 'azure-ad') {
           token.provider = account.provider;
@@ -72,14 +55,10 @@ const handler = NextAuth({
           token.expiresAt = deriveExpiresAtFromAccessToken(account.access_token);
         }
       } else if (!token.expiresAt && typeof token.accessToken === 'string') {
-        // derive on subsequent runs if still missing
         token.expiresAt = deriveExpiresAtFromAccessToken(token.accessToken);
       }
 
-      // Debug breadcrumb (server-side; visible in Vercel function logs)
-      console.log('🔁 Azure check:', { provider: token.provider, exp: token.expiresAt });
-
-      // Refresh Azure token if expiring soon
+      // Refresh Azure token a minute before expiry
       if (
         token.provider === 'azure-ad' &&
         typeof token.expiresAt === 'number' &&
@@ -87,7 +66,6 @@ const handler = NextAuth({
         typeof token.refreshToken === 'string' &&
         token.refreshToken.length > 0
       ) {
-        console.log('🔁 Attempting Azure token refresh…');
         try {
           const body = new URLSearchParams({
             client_id: process.env.AZURE_AD_CLIENT_ID!,
@@ -116,10 +94,10 @@ const handler = NextAuth({
               token.expiresAt = deriveExpiresAtFromAccessToken(data.access_token);
             }
           } else {
-            console.error('🔁 Azure refresh failed:', resp.status, await resp.text());
+            // optional: swallow on prod; NextAuth will try again next request
           }
-        } catch (e) {
-          console.error('🔁 Azure refresh error:', e);
+        } catch {
+          // optional: swallow on prod
         }
       }
 
