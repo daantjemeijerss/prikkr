@@ -199,21 +199,26 @@ return (
           </p>
         )}
 
-        <input
-          type="text"
-          placeholder="Your name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="border border-gray-300 rounded px-4 py-2 mb-4 w-full max-w-md text-base"
-        />
+<input
+  type="text"
+  placeholder="Your name"
+  value={name}
+  onChange={(e) => setName(e.target.value)}
+  onInput={(e) => setName((e.target as HTMLInputElement).value)}
+  autoComplete="name"
+  className="border border-gray-300 rounded px-4 py-2 mb-4 w-full max-w-md text-base"
+/>
 
-        <input
-          type="email"
-          placeholder="Your email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="border border-gray-300 rounded px-4 py-2 mb-8 w-full max-w-md text-base"
-        />
+<input
+  type="email"
+  placeholder="Your email"
+  value={email}
+  onChange={(e) => setEmail(e.target.value)}
+  onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
+  autoComplete="email"
+  className="border border-gray-300 rounded px-4 py-2 mb-8 w-full max-w-md text-base"
+/>
+
 
         <div className="flex flex-col sm:flex-row justify-center items-center gap-4 sm:gap-8 mb-10">
           <label className="flex items-center gap-x-2 text-base sm:text-lg">
@@ -444,8 +449,13 @@ return <>{grouped}</>;
   apiEndpoint="/api/save-response"
   payload={buildPayload}
   successHref={(theId) => `/rsvp/${theId}/results_rsvp`}
-  guard={() => !!idStr}
-  disabled={!idStr}
+  guard={() => canSubmit}
+  disabled={!canSubmit}
+  onError={(err) => {
+    // Make failures visible on Vercel
+    console.error('RSVP submit failed:', err);
+    alert('Submit failed. Please check name & email, then try again.\n\nDetails: ' + String(err));
+  }}
 />
 
 
