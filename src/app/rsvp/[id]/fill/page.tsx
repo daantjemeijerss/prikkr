@@ -18,8 +18,10 @@ import {
   SubmitAndRedirectButton,
   TimeSlotButton,
   DayAvailabilityButton,
-  calcSlotGridCols,
-  calcDailyGridCols,   
+  slotSymmetricGridClass,
+  dailySymmetricGridClass,
+  dailyWeekPadStart,
+  dailyColStartMdClass,
   type BusySegment,
 } from '@/utils/Buttons';
 
@@ -224,155 +226,182 @@ return (
             });
           };
 
-const grouped = (slotDuration === 'daily' || slotDuration === '1440')
-  ? Object.entries(
-      dates.reduce((acc: Record<string, string[]>, dateStr: string) => {
-        const date = DateTime.fromISO(dateStr);
-        const weekStart = date.startOf('week').toISODate()!;
-        if (!acc[weekStart]) acc[weekStart] = [];
-        acc[weekStart].push(dateStr);
-        return acc;
-      }, {})
-    ).map(([weekStartStr, weekDates], weekIdx) => {
-      const startDate = DateTime.fromISO(weekStartStr);
-      const endDate = startDate.plus({ days: 6 });
 
-      return (
+const grouped =
+  (slotDuration === 'daily' || slotDuration === '1440')
+    ? (() => {
+        // Group by Monday (ISO weekday 1)
+        const weeksByMonday = dates.reduce((acc: Record<string, string[]>, iso: string) => {
+          const d = DateTime.fromISO(iso, { zone: 'UTC' });
+          const mondayISO = d.set({ weekday: 1 }).toISODate()!;
+          (acc[mondayISO] ??= []).push(iso);
+          return acc;
+        }, {});
+
+        return Object.entries(weeksByMonday)
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([mondayISO, weekDates], weekIdx) => {
+            weekDates.sort(); // Mon→Sun
+
+            const startDate = DateTime.fromISO(mondayISO);
+            const endDate = startDate.plus({ days: 6 });
+
+            const offset = dailyWeekPadStart(weekDates[0]);     // 0..6 (Mon=0)
+            const firstColStart = dailyColStartMdClass(offset); // md:col-start-1..7
+
+            return (
+              <div
+                key={`week-${weekIdx}`}
+                className="bg-white rounded-xl shadow-md px-2 py-1 mb-2 w-full max-w-screen-xl mx-auto"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-start gap-4 w-full">
+                  {/* Week label */}
+                  <div className="sm:w-[10rem] text-md text-left">
+                    <div className="font-bold text-gray-800">Week {startDate.weekNumber}</div>
+                    <div className="text-gray-600">
+                      {startDate.toFormat('dd LLL')} – {endDate.toFormat('dd LLL')}
+                    </div>
+                  </div>
+
+                  <div className={dailySymmetricGridClass()}>
+                    {weekDates.map((date, i) => {
+                      const isSelected = manualSelections[date]?.has('All Day');
+
+                      const dayStart = DateTime.fromISO(`${date}T00:00:00`, { zone: 'Europe/Amsterdam' });
+                      const dayEnd = dayStart.plus({ days: 1 });
+                      const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
+
+                      const overlappingBusy = busySlots
+                        .map(({ start, end }) => {
+                          const busyStart = DateTime.fromISO(start);
+                          const busyEnd = DateTime.fromISO(end);
+                          return {
+                            start: Math.max(0, busyStart.diff(dayStart, 'minutes').minutes),
+                            end: Math.min(totalMinutes, busyEnd.diff(dayStart, 'minutes').minutes),
+                          };
+                        })
+                        .filter(({ start, end }) => start < end);
+
+                      const busyDuration = overlappingBusy.reduce((sum, b) => sum + (b.end - b.start), 0);
+                      const freeRatio = 1 - busyDuration / totalMinutes;
+
+                      const isFullyFree = freeRatio === 1;
+                      const isMostlyFree = freeRatio >= 0.8;
+                      const dateLabel = DateTime.fromISO(date).toFormat('ccc dd LLL');
+
+                      return (
+                        <DayAvailabilityButton
+                          key={date}
+                          dateLabel={dateLabel}
+                          isSelected={isSelected}
+                          isFullyFree={isFullyFree}
+                          isMostlyFree={isMostlyFree}
+                          customMode={customMode}
+                          onClick={customMode ? () => {
+                            setManualSelections(prev => {
+                              const next = new Set(prev[date] || []);
+                              next.has('All Day') ? next.delete('All Day') : next.add('All Day');
+                              return { ...prev, [date]: next };
+                            });
+                          } : undefined}
+                          className={i === 0 ? firstColStart : ''} // align first day to Monday column
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {customMode && (
+                  <div className="mt-2 flex justify-center w-full">
+                    <button
+                      onClick={() => {
+                        const allSelected = weekDates.every(d => manualSelections[d]?.has('All Day'));
+                        setManualSelections(prev => {
+                          const updated = { ...prev };
+                          for (const d of weekDates) {
+                            updated[d] = new Set(allSelected ? [] : ['All Day']);
+                          }
+                          return updated;
+                        });
+                      }}
+                      className="text-blue-600 text-sm underline"
+                    >
+                      {weekDates.every(d => manualSelections[d]?.has('All Day')) ? 'Unselect all' : 'Select all'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          });
+      })()
+    : dates.map(date => (
         <div
-          key={`week-${weekIdx}`}
-          className="bg-white rounded-xl shadow-md px-2 py-1 mb-2 w-full max-w-screen-xl mx-auto"
+          key={date}
+          className="bg-white rounded-xl shadow-md px-4 py-1 mb-2 w-full max-w-screen-xl mx-auto"
         >
-          <div className="flex flex-col sm:flex-row sm:items-start gap-4 w-full">
-            {/* Week label */}
-            <div className="sm:w-[10rem] text-md text-left">
-              <div className="font-bold text-gray-800">Week {startDate.weekNumber}</div>
-              <div className="text-gray-600">
-                {startDate.toFormat('dd LLL')} – {endDate.toFormat('dd LLL')}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 w-full">
+            <div className="text-left sm:min-w-[10rem] pt-1 self-start">
+              <div className="text-sm text-gray-500 font-medium">{getWeekday(date)}</div>
+              <div className="text-base sm:text-lg font-semibold text-gray-900">
+                {formatDisplayDate(date)}
               </div>
             </div>
 
-<div className={calcDailyGridCols()}>
-  {weekDates.map((date) => {
-    const isSelected = manualSelections[date]?.has('All Day');
+            <div className={slotSymmetricGridClass(extendedHours)}>
+              {fullSlots.map((time) => {
+                const isSelected = manualSelections[date]?.has(time);
 
-    const dayStart = DateTime.fromISO(`${date}T00:00:00`, { zone: 'Europe/Amsterdam' });
-    const dayEnd = dayStart.plus({ days: 1 });
-    const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
+                const [h, m] = time.split(':').map(Number);
+                const end = new Date(0, 0, 0, h, m + durationMinutes);
+                const endTime = end.toTimeString().slice(0, 5);
 
-    const overlappingBusy = busySlots
-      .map(({ start, end }) => {
-        const busyStart = DateTime.fromISO(start);
-        const busyEnd = DateTime.fromISO(end);
-        return {
-          start: Math.max(0, busyStart.diff(dayStart, 'minutes').minutes),
-          end: Math.min(totalMinutes, busyEnd.diff(dayStart, 'minutes').minutes),
-        };
-      })
-      .filter(({ start, end }) => start < end);
+                const segments = getSlotBusySegments(
+                  time,
+                  date,
+                  busySlots,
+                  durationMinutes
+                ) as BusySegment[];
 
-    const busyDuration = overlappingBusy.reduce((sum, b) => sum + (b.end - b.start), 0);
-    const freeRatio = 1 - busyDuration / totalMinutes;
-
-    const isFullyFree = freeRatio === 1;
-    const isMostlyFree = freeRatio >= 0.8;
-    const dateLabel = DateTime.fromISO(date).toFormat('ccc dd LLL');
-
-    return (
-      <DayAvailabilityButton
-        key={date}
-        dateLabel={dateLabel}
-        isSelected={isSelected}
-        isFullyFree={isFullyFree}
-        isMostlyFree={isMostlyFree}
-        customMode={customMode}
-        onClick={customMode ? () => handleSlotToggle(date, 'All Day') : undefined}
-      />
-    );
-  })}
-</div>
+                return (
+                  <TimeSlotButton
+                    key={time}
+                    label={`${time} - ${endTime}`}
+                    segments={segments}
+                    selected={isSelected}
+                    customMode={customMode}
+                    onClick={customMode ? () => {
+                      setManualSelections(prev => {
+                        const next = new Set(prev[date] || []);
+                        next.has(time) ? next.delete(time) : next.add(time);
+                        return { ...prev, [date]: next };
+                      });
+                    } : undefined}
+                  />
+                );
+              })}
+            </div>
           </div>
 
           {customMode && (
             <div className="mt-2 flex justify-center w-full">
               <button
                 onClick={() => {
-                  const allSelected = weekDates.every(date => manualSelections[date]?.has('All Day'));
-                  setManualSelections(prev => {
-                    const updated = { ...prev };
-                    for (const date of weekDates) {
-                      updated[date] = new Set(allSelected ? [] : ['All Day']);
-                    }
-                    return updated;
-                  });
+                  const allSelected = fullSlots.every(t => manualSelections[date]?.has(t));
+                  setManualSelections(prev => ({
+                    ...prev,
+                    [date]: new Set(allSelected ? [] : fullSlots),
+                  }));
                 }}
                 className="text-blue-600 text-sm underline"
               >
-                {weekDates.every(date => manualSelections[date]?.has('All Day'))
-                  ? 'Unselect all'
-                  : 'Select all'}
+                {manualSelections[date]?.size === fullSlots.length ? 'Unselect all' : 'Select all'}
               </button>
             </div>
           )}
         </div>
-      );
-    })
-            : dates.map(date => (
-                <div
-                  key={date}
-                  className="bg-white rounded-xl shadow-md px-4 py-1 mb-2 w-full max-w-screen-xl mx-auto"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 w-full">
-                    <div className="text-left sm:min-w-[10rem]">
-                      <div className="text-sm text-gray-500 font-medium">{getWeekday(date)}</div>
-                      <div className="text-base sm:text-lg font-semibold text-gray-900">
-                        {formatDisplayDate(date)}
-                      </div>
-                    </div>
+      ));
 
-<div className={calcSlotGridCols(slotType, extendedHours)}>
-  {fullSlots.map((time) => {
-    const isSelected = manualSelections[date]?.has(time);
-
-    const [h, m] = time.split(':').map(Number);
-    const end = new Date(0, 0, 0, h, m + durationMinutes);
-    const endTime = end.toTimeString().slice(0, 5);
-
-    const segments: BusySegment[] = getSlotBusySegments(
-      time,
-      date,
-      busySlots,
-      durationMinutes
-    );
-
-    return (
-      <TimeSlotButton
-        key={time}
-        label={`${time} - ${endTime}`}
-        segments={segments}
-        selected={isSelected}
-        customMode={customMode}
-        onClick={customMode ? () => handleSlotToggle(date, time) : undefined}
-      />
-    );
-  })}
-</div>
-
-                  </div>
-
-                  {customMode && (
-                    <div className="mt-2 flex justify-center w-full">
-                      <button
-                        onClick={() => handleDayToggle(date)}
-                        className="text-blue-600 text-sm underline"
-                      >
-                        {manualSelections[date]?.size === fullSlots.length ? 'Unselect all' : 'Select all'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ));
-
-          return <>{grouped}</>;
+return <>{grouped}</>;
         })()}
 
 <SubmitAndRedirectButton
