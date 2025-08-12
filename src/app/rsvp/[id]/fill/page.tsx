@@ -42,6 +42,12 @@ export default function RSVPFillPage() {
 
   const slotType = getSlotTypeLabel(slotDuration);
   const durationMinutes = parseInt(String(slotDuration)); 
+  // One flag to control both guard() and disabled
+const canSubmit = useMemo(
+  () => Boolean(idStr && name.trim() && email.trim()),
+  [idStr, name, email]
+);
+
 
   useEffect(() => {
     const id = params?.id;
@@ -110,33 +116,59 @@ const buildPayload = async () => {
     return { id: '', name, email, selections: {} };
   }
 
-  // Persist name/email like before
   localStorage.setItem(`prikkr-name-${id}`, name);
   localStorage.setItem(`prikkr-email-${id}`, email);
 
-  // Use your existing logic to compute selections
   const fullSlots = generateSlots();
   const dates = range ? getDateRange(range.from, range.to) : [];
 
   let selections: Record<string, string[]> = {};
 
   if (customMode) {
+    const out: Record<string, string[]> = {};
     for (const [date, set] of Object.entries(manualSelections)) {
-      selections[date] = Array.from(set);
+      out[date] = Array.from(set);
     }
+    selections = out;
   } else {
     const computed: Record<string, string[]> = {};
+
     for (const date of dates) {
       const available: string[] = [];
+
       for (const time of fullSlots) {
-        const segments = getSlotBusySegments(time, date, busySlots, durationMinutes);
-        const isFree = !segments.some(s => s.color === '#ef4444');
-        if (isFree) available.push(time);
+        if (time === 'All Day' || time === '~All Day') {
+          // DAILY HANDLING (no HH:mm here)
+          const dayStart = DateTime.fromISO(`${date}T00:00:00`, { zone: 'Europe/Amsterdam' });
+          const dayEnd = dayStart.plus({ days: 1 });
+          const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
+
+          const busyDur = busySlots
+            .map(({ start, end }) => {
+              const bs = DateTime.fromISO(start);
+              const be = DateTime.fromISO(end);
+              return {
+                start: Math.max(0, bs.diff(dayStart, 'minutes').minutes),
+                end: Math.min(totalMinutes, be.diff(dayStart, 'minutes').minutes),
+              };
+            })
+            .filter(({ start, end }) => start < end)
+            .reduce((sum, b) => sum + (b.end - b.start), 0);
+
+          const freeRatio = 1 - busyDur / totalMinutes;
+          if (freeRatio >= 1) available.push('All Day');
+          else if (freeRatio >= 0.8) available.push('~All Day');
+        } else {
+          // NON-DAILY
+          const segments = getSlotBusySegments(time, date, busySlots, durationMinutes);
+          const isFree = !segments.some(s => s.color === '#ef4444');
+          if (isFree) available.push(time);
+        }
       }
-      if (available.length > 0) {
-        computed[date] = available;
-      }
+
+      if (available.length > 0) computed[date] = available;
     }
+
     selections = computed;
   }
 
@@ -401,6 +433,12 @@ const grouped =
         </div>
       ));
 
+const canSubmit = useMemo(
+  () => Boolean(idStr && name.trim() && email.trim()),
+  [idStr, name, email]
+);
+
+
 return <>{grouped}</>;
         })()}
 
@@ -410,8 +448,8 @@ return <>{grouped}</>;
   apiEndpoint="/api/save-response"
   payload={buildPayload}
   successHref={(theId) => `/rsvp/${theId}/results_rsvp`}
-  guard={() => !!idStr && !!name && !!email}
-  disabled={!name || !email}
+  guard={() => canSubmit}
+  disabled={!canSubmit}
 />
 
       </div>
