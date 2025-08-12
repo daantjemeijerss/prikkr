@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react';
 import { DateRange } from 'react-date-range';
 import 'react-date-range/dist/styles.css';        // main style file
 import 'react-date-range/dist/theme/default.css'; // theme css file
+import { BaseActionButton } from '@/utils/Buttons';
 
 
 export default function CreatePage() {
@@ -244,13 +245,25 @@ for (let hour = startHour; hour < endHour; hour++) {
           {error && <div className="text-red-600 font-medium mb-4">{error}</div>}
 
 
-          <button onClick={handleSubmit} disabled={isSubmitting}
-            className={`px-6 py-3 text-base sm:text-lg font-semibold rounded-xl transition-all duration-150 transform hover:scale-105 shadow-[0_8px_20px_rgba(0,0,0,0.25)] bg-green-600 text-white hover:bg-green-700 border border-green-500 ${
-              isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
-            }`}
-          >
-            {isSubmitting ? 'Creating...' : 'Create Prikkr'}
-          </button>
+<BaseActionButton
+  onClick={handleSubmit}
+  isLoading={isSubmitting}
+  // optional: hard-disable when required fields are empty so the button matches your validation UX
+  disabled={
+    isSubmitting ||
+    !eventName ||
+    !creatorName ||
+    !creatorEmail ||
+    !from ||
+    !to ||
+    !slotDuration ||
+    (slotDuration === 'custom' && !customMinutes)
+  }
+  className="w-full sm:w-auto"   // optional: full width on mobile
+>
+  Create Prikkr
+</BaseActionButton>
+
         </div>
       </section>
 

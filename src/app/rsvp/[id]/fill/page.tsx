@@ -14,11 +14,19 @@ import {
   getSlotBusySegments,
   TimeSlot
 } from '@/utils/calendarHelpers';
-
+import {
+  SubmitAndRedirectButton,
+  TimeSlotButton,
+  DayAvailabilityButton,
+  calcSlotGridCols,
+  calcDailyGridCols,   
+  type BusySegment,
+} from '@/utils/Buttons';
 
 
 export default function RSVPFillPage() {
   const params = useParams();
+  const idStr = typeof params?.id === 'string' ? params.id : undefined;
   const router = useRouter();
   const { data: session } = useSession();
   const [range, setRange] = useState<{ from: string; to: string } | null>(null);
@@ -29,7 +37,6 @@ export default function RSVPFillPage() {
   const [email, setEmail] = useState('');
   const [customMode, setCustomMode] = useState(false);
   const [manualSelections, setManualSelections] = useState<Record<string, Set<string>>>({});
-  const [isSending, setIsSending] = useState(false);
 
   const slotType = getSlotTypeLabel(slotDuration);
   const durationMinutes = parseInt(String(slotDuration)); 
@@ -94,12 +101,47 @@ useEffect(() => {
   return slots;
 };
 
+const buildPayload = async () => {
+  const id = idStr;
+  if (!id) {
+    console.error('❌ Missing or invalid RSVP id');
+    return { id: '', name, email, selections: {} };
+  }
 
-  // [...existing imports and logic as previously updated...]
+  // Persist name/email like before
+  localStorage.setItem(`prikkr-name-${id}`, name);
+  localStorage.setItem(`prikkr-email-${id}`, email);
 
-// Continue component from logic setup
+  // Use your existing logic to compute selections
+  const fullSlots = generateSlots();
+  const dates = range ? getDateRange(range.from, range.to) : [];
 
-// UI rendering starts here
+  let selections: Record<string, string[]> = {};
+
+  if (customMode) {
+    for (const [date, set] of Object.entries(manualSelections)) {
+      selections[date] = Array.from(set);
+    }
+  } else {
+    const computed: Record<string, string[]> = {};
+    for (const date of dates) {
+      const available: string[] = [];
+      for (const time of fullSlots) {
+        const segments = getSlotBusySegments(time, date, busySlots, durationMinutes);
+        const isFree = !segments.some(s => s.color === '#ef4444');
+        if (isFree) available.push(time);
+      }
+      if (available.length > 0) {
+        computed[date] = available;
+      }
+    }
+    selections = computed;
+  }
+
+  return { id, name, email, selections, isCreator: false };
+};
+
+
 return (
   <main className="relative flex flex-col min-h-screen bg-white text-gray-900">
     <img
@@ -209,80 +251,45 @@ const grouped = (slotDuration === 'daily' || slotDuration === '1440')
               </div>
             </div>
 
-            {/* Grid of 7 buttons */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2 flex-grow">
-              {weekDates.map(date => {
-                const isSelected = manualSelections[date]?.has('All Day');
+<div className={calcDailyGridCols()}>
+  {weekDates.map((date) => {
+    const isSelected = manualSelections[date]?.has('All Day');
 
-                const dayStart = DateTime.fromISO(date + 'T00:00:00', { zone: 'Europe/Amsterdam' });
-                const dayEnd = dayStart.plus({ days: 1 });
-                const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
+    const dayStart = DateTime.fromISO(`${date}T00:00:00`, { zone: 'Europe/Amsterdam' });
+    const dayEnd = dayStart.plus({ days: 1 });
+    const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
 
-                const overlappingBusy = busySlots
-                  .map(({ start, end }) => {
-                    const busyStart = DateTime.fromISO(start);
-                    const busyEnd = DateTime.fromISO(end);
-                    return {
-                      start: Math.max(0, busyStart.diff(dayStart, 'minutes').minutes),
-                      end: Math.min(totalMinutes, busyEnd.diff(dayStart, 'minutes').minutes),
-                    };
-                  })
-                  .filter(({ start, end }) => start < end);
+    const overlappingBusy = busySlots
+      .map(({ start, end }) => {
+        const busyStart = DateTime.fromISO(start);
+        const busyEnd = DateTime.fromISO(end);
+        return {
+          start: Math.max(0, busyStart.diff(dayStart, 'minutes').minutes),
+          end: Math.min(totalMinutes, busyEnd.diff(dayStart, 'minutes').minutes),
+        };
+      })
+      .filter(({ start, end }) => start < end);
 
-                const busyDuration = overlappingBusy.reduce((sum, b) => sum + (b.end - b.start), 0);
-                const freeRatio = 1 - busyDuration / totalMinutes;
+    const busyDuration = overlappingBusy.reduce((sum, b) => sum + (b.end - b.start), 0);
+    const freeRatio = 1 - busyDuration / totalMinutes;
 
-                const isFullyFree = freeRatio === 1;
-                const isMostlyFree = freeRatio >= 0.8;
+    const isFullyFree = freeRatio === 1;
+    const isMostlyFree = freeRatio >= 0.8;
+    const dateLabel = DateTime.fromISO(date).toFormat('ccc dd LLL');
 
-                const dateLabel = DateTime.fromISO(date).toFormat('ccc dd LLL');
-
-                const baseClass =
-                  "w-full px-2 py-4 text-sm font-semibold text-center rounded-xl transition-all duration-100 shadow-[0_8px_20px_rgba(0,0,0,0.25)] border";
-
-                if (customMode) {
-                  const bg =
-                    isFullyFree
-                      ? "bg-green-100 hover:bg-green-200 text-gray-800"
-                      : isMostlyFree
-                      ? "bg-yellow-100 hover:bg-yellow-200 text-gray-800"
-                      : "bg-red-100 hover:bg-red-200 text-gray-800";
-
-                  return (
-                    <button
-                      key={date}
-                      onClick={() => handleSlotToggle(date, 'All Day')}
-                      className={`${baseClass} ${isSelected ? 'bg-green-500 text-white' : bg}`}
-                    >
-                      {dateLabel}
-                    </button>
-                  );
-                } else {
-                  const bg =
-                    isFullyFree
-                      ? "bg-green-500"
-                      : isMostlyFree
-                      ? "bg-yellow-400"
-                      : "bg-red-500";
-
-                  const icon = isFullyFree ? '✔' : isMostlyFree ? '~' : '✘';
-
-                  return (
-                    <div
-                      key={date}
-                      className={`${baseClass} ${bg} text-white`}
-                    >
-                      <span className="flex items-center justify-center gap-1">
-                        {dateLabel}
-                        <span className={`inline-block ml-1 text-base ${icon === '✘' ? '' : 'animate-bounce'}`}>
-                          {icon}
-                        </span>
-                      </span>
-                    </div>
-                  );
-                }
-              })}
-            </div>
+    return (
+      <DayAvailabilityButton
+        key={date}
+        dateLabel={dateLabel}
+        isSelected={isSelected}
+        isFullyFree={isFullyFree}
+        isMostlyFree={isMostlyFree}
+        customMode={customMode}
+        onClick={customMode ? () => handleSlotToggle(date, 'All Day') : undefined}
+      />
+    );
+  })}
+</div>
           </div>
 
           {customMode && (
@@ -322,85 +329,34 @@ const grouped = (slotDuration === 'daily' || slotDuration === '1440')
                       </div>
                     </div>
 
-<div
-  className={`w-full grid auto-rows-fr gap-x-2 gap-y-2 ${
-    slotType === 'hourly'
-      ? extendedHours
-        ? 'grid-cols-3 sm:grid-cols-6'
-        : 'grid-cols-3 sm:grid-cols-4 sm:grid-cols-8'
-      : slotType === 'quarter-hour'
-      ? 'grid-cols-3 sm:grid-cols-6 sm:grid-cols-8'
-      : slotType === 'half-hour'
-      ? 'grid-cols-3 sm:grid-cols-5 sm:grid-cols-6'
-      : slotType === '10-minutes'
-      ? 'grid-cols-3 sm:grid-cols-4 sm:grid-cols-6'
-      : slotType === 'daily'
-      ? 'grid-cols-3 sm:grid-cols-7'
-      : 'grid-cols-3 sm:grid-cols-4 sm:grid-cols-6'
-  }`}
->
-                      {fullSlots.map(time => {
-                        const isSelected = manualSelections[date]?.has(time);
-                        const [h, m] = time.split(':').map(Number);
-                        const end = new Date(0, 0, 0, h, m + durationMinutes);
-                        const endTime = end.toTimeString().slice(0, 5);
+<div className={calcSlotGridCols(slotType, extendedHours)}>
+  {fullSlots.map((time) => {
+    const isSelected = manualSelections[date]?.has(time);
 
-                        if (customMode) {
-  const segments = getSlotBusySegments(time, date, busySlots, durationMinutes);
+    const [h, m] = time.split(':').map(Number);
+    const end = new Date(0, 0, 0, h, m + durationMinutes);
+    const endTime = end.toTimeString().slice(0, 5);
 
-  const backgroundGradient = segments.length
-    ? `linear-gradient(to right, ${segments
-        .map(s => `${s.color}33 ${s.from * 100}% ${s.to * 100}%`) // '33' adds ~20% opacity
-        .join(', ')})`
-    : undefined;
+    const segments: BusySegment[] = getSlotBusySegments(
+      time,
+      date,
+      busySlots,
+      durationMinutes
+    );
 
- return (
-  <button
-  key={time}
-  onClick={() => handleSlotToggle(date, time)}
-  className={`px-2 sm:px-3 py-2 min-h-[2.25rem] w-full text-xs sm:text-sm font-semibold text-center rounded-xl transition-all duration-100 shadow-md border whitespace-nowrap ${
-    isSelected
-      ? 'bg-green-500 text-white'
-      : 'text-gray-800 hover:bg-gray-100'
-  }`}
-  style={{
-    background: isSelected ? undefined : backgroundGradient,
-  }}
->
-  <div className="flex items-center justify-center gap-1">
-    <span>{`${time} - ${endTime}`}</span>
-    {isSelected && <span className="text-white text-xs float-check">✔</span>}
-  </div>
-</button>
-);
-}
+    return (
+      <TimeSlotButton
+        key={time}
+        label={`${time} - ${endTime}`}
+        segments={segments}
+        selected={isSelected}
+        customMode={customMode}
+        onClick={customMode ? () => handleSlotToggle(date, time) : undefined}
+      />
+    );
+  })}
+</div>
 
-
-                        const segments = getSlotBusySegments(time, date, busySlots, durationMinutes);
-                        const gradientStyle = segments.length
-                          ? {
-                              background: `linear-gradient(to right, ${segments.map(s => `${s.color} ${s.from * 100}% ${s.to * 100}%`).join(', ')})`,
-                              color: '#fff',
-                            }
-                          : {};
-
-                        const isFullyGreen = segments.length === 1 && segments[0].color === '#22c55e';
-
-return (
-  <button
-    key={time}
-    className="min-w-[87px] sm:min-w-0 px-3 py-4 text-[10px] sm:text-sm font-semibold text-center rounded-xl w-full transition-all duration-100 shadow-[0_4px_10px_rgba(0,0,0,0.25)] border"
-    style={gradientStyle}
-  >
-    {`${time} - ${endTime}`}
-    {isFullyGreen && (
-      <span className="text-white text-xs ml-1 float-check animate-bounce-slow inline-block">✔</span>
-    )}
-  </button>
-);
-
-                      })}
-                    </div>
                   </div>
 
                   {customMode && (
@@ -419,45 +375,16 @@ return (
           return <>{grouped}</>;
         })()}
 
-        <button
-          onClick={async () => {
-            setIsSending(true);
-            const id = params?.id;
-            if (!id || !name || !email || typeof id !== 'string') return;
-            localStorage.setItem(`prikkr-name-${id}`, name);
-            localStorage.setItem(`prikkr-email-${id}`, email);
-            const fullSlots = generateSlots();
-            const dates = range ? getDateRange(range.from, range.to) : [];
-            let selections: Record<string, string[]> = {};
-            if (customMode) {
-              for (const [date, set] of Object.entries(manualSelections)) {
-                selections[date] = Array.from(set);
-              }
-            } else {
-              for (const date of dates) {
-                const available: string[] = [];
-                for (const time of fullSlots) {
-                  const segments = getSlotBusySegments(time, date, busySlots, durationMinutes);
-                  const isFree = !segments.some(s => s.color === '#ef4444');
-                  if (isFree) available.push(time);
-                }
-                if (available.length > 0) {
-                  selections[date] = available;
-                }
-              }
-            }
-            await fetch('/api/save-response', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id, name, email, selections }),
-            });
-            router.push(`/rsvp/${id}/results_rsvp`);
-          }}
-          disabled={isSending || !name || !email}
-          className={`mt-6 px-6 py-3 text-base sm:text-lg font-semibold rounded-xl transition-all duration-150 transform hover:scale-105 shadow bg-green-600 text-white hover:bg-green-700 border border-green-500 ${isSending || !name || !email ? 'opacity-70 cursor-not-allowed' : ''}`}
-        >
-          {isSending ? 'Sending...' : 'Send out!'}
-        </button>
+<SubmitAndRedirectButton
+  id={idStr}
+  text="Send out!"
+  apiEndpoint="/api/save-response"
+  payload={buildPayload}
+  successHref={(theId) => `/rsvp/${theId}/results_rsvp`}
+  guard={() => !!idStr && !!name && !!email}
+  disabled={!name || !email}
+/>
+
       </div>
     </section>
 

@@ -15,11 +15,23 @@ import {
   getSlotTypeLabel,
   TimeSlot
 } from '@/utils/calendarHelpers';
+import {
+  SubmitAndRedirectButton,
+  TimeSlotButton,
+  DayAvailabilityButton,
+  slotSymmetricGridClass,
+  dailySymmetricGridClass,
+  dailyWeekPadStart,
+  dailyColStartMdClass,   // ← new
+  fixedCols,              // (ok to keep if you use elsewhere, otherwise remove)
+  type BusySegment,
+} from '@/utils/Buttons';
 
 
 
 export default function PrikkrPage() {
   const params = useParams();
+  const idStr = typeof params?.id === 'string' ? params.id : undefined;
   const router = useRouter();
   const { data: session } = useSession();
   const [busySlots, setBusySlots] = useState<TimeSlot[]>([]);
@@ -28,7 +40,6 @@ export default function PrikkrPage() {
   const [slotDuration, setSlotDuration] = useState<string>('hourly');
   const [customMode, setCustomMode] = useState(false);
   const [manualSelections, setManualSelections] = useState<Record<string, Set<string>>>({});
-  const [isSending, setIsSending] = useState(false);
 
 
   useEffect(() => {
@@ -113,83 +124,74 @@ useEffect(() => {
     });
   };
 
-  const handleSendOut = async () => {
-    setIsSending(true);
-    const id = params?.id;
-    const userName = session?.user?.name || session?.user?.email || 'Anonymous';
-    if (!id || typeof id !== 'string') return;
-
-    let serialized: Record<string, string[]> = {};
-
-    if (customMode) {
-      for (const [date, times] of Object.entries(manualSelections)) {
-        serialized[date] = Array.from(times);
-      }
-    } else {
-      const computed: Record<string, string[]> = {};
-      for (const date of dates) {
-        const availableSlots: string[] = [];
-
-for (const time of fullSlots) {
-  if (time === 'All Day') {
-    const dayStart = DateTime.fromISO(date + 'T00:00:00', { zone: 'Europe/Amsterdam' });
-    const dayEnd = dayStart.plus({ days: 1 });
-    const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
-
-    const busyDur = busySlots
-      .map(({ start, end }) => {
-        const busyStart = DateTime.fromISO(start);
-        const busyEnd = DateTime.fromISO(end);
-        return {
-          start: Math.max(0, busyStart.diff(dayStart, 'minutes').minutes),
-          end: Math.min(totalMinutes, busyEnd.diff(dayStart, 'minutes').minutes),
-        };
-      })
-      .filter(({ start, end }) => start < end)
-      .reduce((sum, b) => sum + (b.end - b.start), 0);
-
-    const freeRatio = 1 - busyDur / totalMinutes;
-
-    if (freeRatio >= 1) {
-      availableSlots.push('All Day');
-    } else if (freeRatio >= 0.8) {
-      availableSlots.push('~All Day'); // special maybe marker
-    }
-  } else {
-    const isBusy = isSlotBusy(time, date, busySlots, durationMinutes);
-    if (!isBusy) {
-      availableSlots.push(time);
-    }
+  const buildPayload = () => {
+  const id = idStr;
+  const userName = session?.user?.name || session?.user?.email || 'Anonymous';
+  if (!id) {
+    console.error('❌ Missing or invalid id');
+    return { id: '', name: userName, email: session?.user?.email, selections: {}, isCreator: true };
   }
-}
 
-        if (availableSlots.length > 0) {
-          computed[date] = availableSlots;
+  let serialized: Record<string, string[]> = {};
+
+  if (customMode) {
+    const out: Record<string, string[]> = {};
+    for (const [date, times] of Object.entries(manualSelections)) {
+      out[date] = Array.from(times);
+    }
+    serialized = out;
+  } else {
+    const computed: Record<string, string[]> = {};
+    for (const date of dates) {
+      const availableSlots: string[] = [];
+
+      for (const time of fullSlots) {
+        if (time === 'All Day') {
+          const dayStart = DateTime.fromISO(date + 'T00:00:00', { zone: 'Europe/Amsterdam' });
+          const dayEnd = dayStart.plus({ days: 1 });
+          const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
+
+          const busyDur = busySlots
+            .map(({ start, end }) => {
+              const busyStart = DateTime.fromISO(start);
+              const busyEnd = DateTime.fromISO(end);
+              return {
+                start: Math.max(0, busyStart.diff(dayStart, 'minutes').minutes),
+                end: Math.min(totalMinutes, busyEnd.diff(dayStart, 'minutes').minutes),
+              };
+            })
+            .filter(({ start, end }) => start < end)
+            .reduce((sum, b) => sum + (b.end - b.start), 0);
+
+          const freeRatio = 1 - busyDur / totalMinutes;
+
+          if (freeRatio >= 1) {
+            availableSlots.push('All Day');
+          } else if (freeRatio >= 0.8) {
+            availableSlots.push('~All Day'); // keep your maybe semantics
+          }
+        } else {
+          const busy = isSlotBusy(time, date, busySlots, durationMinutes);
+          if (!busy) availableSlots.push(time);
         }
       }
-      serialized = computed;
-    }
 
-    try {
-      await fetch('/api/save-response', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id,
-          name: userName,
-          email: session?.user?.email,
-          selections: serialized,
-          isCreator: true,
-        }),
-      });
-
-      router.push(`/share/${id}`);
-    } catch (error) {
-      console.error('❌ Failed to save response:', error);
-    } finally {
-      setIsSending(false);
+      if (availableSlots.length > 0) {
+        computed[date] = availableSlots;
+      }
     }
+    serialized = computed;
+  }
+
+  return {
+    id,
+    name: userName,
+    email: session?.user?.email,
+    selections: serialized,
+    isCreator: true,
   };
+};
+
 
     return (
     <main className="relative flex flex-col min-h-screen bg-white text-gray-900">
@@ -226,137 +228,111 @@ for (const time of fullSlots) {
   </label>
 </div>
 
-
 {(slotDuration === 'daily' || slotDuration === '1440') ? (
-  Object.entries(
-    dates.reduce((acc: Record<string, string[]>, dateStr: string) => {
-      const date = DateTime.fromISO(dateStr);
-      const weekStart = date.startOf('week').toISODate()!;
-      if (!acc[weekStart]) acc[weekStart] = [];
-      acc[weekStart].push(dateStr);
+  (() => {
+    // Group by Monday (ISO weekday 1)
+    const weeksByMonday = dates.reduce((acc: Record<string, string[]>, iso: string) => {
+      const d = DateTime.fromISO(iso, { zone: 'UTC' });
+      const mondayISO = d.set({ weekday: 1 }).toISODate()!; // always the Monday of that ISO week
+      (acc[mondayISO] ??= []).push(iso);
       return acc;
-    }, {})
-  ).map(([weekStartStr, weekDates], weekIdx) => {
-    const startDate = DateTime.fromISO(weekStartStr);
-    const endDate = startDate.plus({ days: 6 });
+    }, {});
 
-    return (
-      <div
-        key={`week-${weekIdx}`}
-        className="bg-white rounded-xl shadow-md px-2 py-1 mb-2 w-full max-w-screen-xl mx-auto"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-start gap-4 w-full">
-          {/* Week label */}
-          <div className="sm:w-[10rem] text-md text-left">
-            <div className="font-bold text-gray-800">Week {startDate.weekNumber}</div>
-            <div className="text-gray-600">
-              {startDate.toFormat('dd LLL')} – {endDate.toFormat('dd LLL')}
+    return Object.entries(weeksByMonday)
+      .sort((a, b) => a[0].localeCompare(b[0])) // keep weeks in order
+      .map(([mondayISO, weekDates], weekIdx) => {
+        weekDates.sort(); // ensure Mon→Sun order within the week
+
+        const startDate = DateTime.fromISO(mondayISO);
+        const endDate = startDate.plus({ days: 6 });
+
+        const offset = dailyWeekPadStart(weekDates[0]);     // 0..6 from Monday
+        const firstColStart = dailyColStartMdClass(offset); // md:col-start-1..7
+
+        return (
+          <div
+            key={`week-${weekIdx}`}
+            className="bg-white rounded-xl shadow-md px-2 py-1 mb-2 w-full max-w-screen-xl mx-auto"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4 w-full">
+              {/* Week label */}
+              <div className="sm:w-[10rem] text-md text-left">
+                <div className="font-bold text-gray-800">Week {startDate.weekNumber}</div>
+                <div className="text-gray-600">
+                  {startDate.toFormat('dd LLL')} – {endDate.toFormat('dd LLL')}
+                </div>
+              </div>
+
+              <div className={dailySymmetricGridClass()}>
+                {weekDates.map((date, i) => {
+                  const isSelected = manualSelections[date]?.has('All Day');
+
+                  const dayStart = DateTime.fromISO(`${date}T00:00:00`, { zone: 'Europe/Amsterdam' });
+                  const dayEnd = dayStart.plus({ days: 1 });
+                  const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
+
+                  const overlappingBusy = busySlots
+                    .map(({ start, end }) => {
+                      const busyStart = DateTime.fromISO(start);
+                      const busyEnd = DateTime.fromISO(end);
+                      return {
+                        start: Math.max(0, busyStart.diff(dayStart, 'minutes').minutes),
+                        end: Math.min(totalMinutes, busyEnd.diff(dayStart, 'minutes').minutes),
+                      };
+                    })
+                    .filter(({ start, end }) => start < end);
+
+                  const busyDuration = overlappingBusy.reduce((sum, b) => sum + (b.end - b.start), 0);
+                  const freeRatio = 1 - busyDuration / totalMinutes;
+
+                  const isFullyFree = freeRatio === 1;
+                  const isMostlyFree = freeRatio >= 0.8;
+                  const dateLabel = DateTime.fromISO(date).toFormat('ccc dd LLL');
+
+                  return (
+                    <DayAvailabilityButton
+                      key={date}
+                      dateLabel={dateLabel}
+                      isSelected={isSelected}
+                      isFullyFree={isFullyFree}
+                      isMostlyFree={isMostlyFree}
+                      customMode={customMode}
+                      onClick={customMode ? () => handleSlotToggle(date, 'All Day') : undefined}
+                      className={i === 0 ? firstColStart : ''}   // offset first visible day
+                    />
+                  );
+                })}
+              </div>
             </div>
+
+            {customMode && (
+              <div className="mt-2 flex justify-center w-full">
+                <button
+                  onClick={() => {
+                    const allSelected = weekDates.every(date => manualSelections[date]?.has('All Day'));
+                    setManualSelections(prev => {
+                      const updated = { ...prev };
+                      for (const date of weekDates) {
+                        updated[date] = new Set(allSelected ? [] : ['All Day']);
+                      }
+                      return updated;
+                    });
+                  }}
+                  className="text-blue-600 text-sm underline"
+                >
+                  {weekDates.every(date => manualSelections[date]?.has('All Day'))
+                    ? 'Unselect all'
+                    : 'Select all'}
+                </button>
+              </div>
+            )}
           </div>
-
-          {/* Grid of 7 buttons */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2 flex-grow">
-            {weekDates.map(date => {
-              const isSelected = manualSelections[date]?.has('All Day');
-
-              const dayStart = DateTime.fromISO(date + 'T00:00:00', { zone: 'Europe/Amsterdam' });
-              const dayEnd = dayStart.plus({ days: 1 });
-              const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
-
-              const overlappingBusy = busySlots
-                .map(({ start, end }) => {
-                  const busyStart = DateTime.fromISO(start);
-                  const busyEnd = DateTime.fromISO(end);
-                  return {
-                    start: Math.max(0, busyStart.diff(dayStart, 'minutes').minutes),
-                    end: Math.min(totalMinutes, busyEnd.diff(dayStart, 'minutes').minutes),
-                  };
-                })
-                .filter(({ start, end }) => start < end);
-
-              const busyDuration = overlappingBusy.reduce((sum, b) => sum + (b.end - b.start), 0);
-              const freeRatio = 1 - busyDuration / totalMinutes;
-
-              const isFullyFree = freeRatio === 1;
-              const isMostlyFree = freeRatio >= 0.8;
-
-              const dateLabel = DateTime.fromISO(date).toFormat('ccc dd LLL');
-
-              const baseClass =
-                "w-full px-2 py-4 text-sm font-semibold text-center rounded-xl transition-all duration-100 shadow-[0_8px_20px_rgba(0,0,0,0.25)] border";
-
-              if (customMode) {
-                const bg =
-                  isFullyFree
-                    ? "bg-green-100 hover:bg-green-200 text-gray-800"
-                    : isMostlyFree
-                    ? "bg-yellow-100 hover:bg-yellow-200 text-gray-800"
-                    : "bg-red-100 hover:bg-red-200 text-gray-800";
-
-                return (
-                  <button
-                    key={date}
-                    onClick={() => handleSlotToggle(date, 'All Day')}
-                    className={`${baseClass} ${isSelected ? 'bg-green-500 text-white' : bg}`}
-                  >
-                    {dateLabel}
-                  </button>
-                );
-              } else {
-                const bg =
-                  isFullyFree
-                    ? "bg-green-500"
-                    : isMostlyFree
-                    ? "bg-yellow-400"
-                    : "bg-red-500";
-
-                const icon = isFullyFree ? '✔' : isMostlyFree ? '~' : '✘';
-
-                return (
-                  <div
-                    key={date}
-                    className={`${baseClass} ${bg} text-white`}
-                  >
-                    <span className="flex items-center justify-center gap-1">
-                      {dateLabel}
-                      <span className={`inline-block ml-1 text-base ${icon === '✘' ? '' : 'animate-bounce'}`}>
-                        {icon}
-                      </span>
-                    </span>
-                  </div>
-                );
-              }
-            })}
-          </div>
-        </div>
-
-        {customMode && (
-          <div className="mt-2 flex justify-center w-full">
-            <button
-              onClick={() => {
-                const allSelected = weekDates.every(date => manualSelections[date]?.has('All Day'));
-                setManualSelections(prev => {
-                  const updated = { ...prev };
-                  for (const date of weekDates) {
-                    updated[date] = new Set(allSelected ? [] : ['All Day']);
-                  }
-                  return updated;
-                });
-              }}
-              className="text-blue-600 text-sm underline"
-            >
-              {weekDates.every(date => manualSelections[date]?.has('All Day'))
-                ? 'Unselect all'
-                : 'Select all'}
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  })
+        );
+      });
+  })()
 ) : (
 
-  // everything else remains untouched for other slot durations
+
   dates.map(date => (
     <div
       key={date}
@@ -370,102 +346,38 @@ for (const time of fullSlots) {
           </div>
         </div>
 
-        <div
-className={`w-full grid gap-x-2 gap-y-2 auto-rows-fr ${
-  slotType === 'hourly'
-    ? extendedHours
-      ? 'grid-cols-3 sm:grid-cols-6'
-      : 'grid-cols-3 sm:grid-cols-4 sm:grid-cols-8'
-    : slotType === 'quarter-hour'
-    ? 'grid-cols-3 sm:grid-cols-6 sm:grid-cols-8'
-    : slotType === 'half-hour'
-    ? 'grid-cols-3 sm:grid-cols-5 sm:grid-cols-6'
-    : slotType === '10-minutes'
-    ? 'grid-cols-3 sm:grid-cols-4 sm:grid-cols-6'
-    : 'grid-cols-3 sm:grid-cols-4 sm:grid-cols-6'
-}`}
->
-          {fullSlots.map(time => {
-            const isSelected = manualSelections[date]?.has(time);
-            const [startH, startM] = time.split(':').map(Number);
-            const step = parseInt(String(slotDuration)); // Always correct, even for 5, 7, etc.
-            const end = new Date(0, 0, 0, startH, startM + step);
-            const endTime = end.toTimeString().slice(0, 5);
+<div className={slotSymmetricGridClass(extendedHours)}>
+  {fullSlots.map((time) => {
+    const isSelected = manualSelections[date]?.has(time);
 
-            if (customMode) {
-  const segments = getSlotBusySegments(time, date, busySlots, durationMinutes);
+    const [startH, startM] = time.split(':').map(Number);
+    const end = new Date(0, 0, 0, startH, startM + durationMinutes);
+    const endTime = end.toTimeString().slice(0, 5);
 
-  const backgroundGradient = segments.length
-    ? `linear-gradient(to right, ${segments
-        .map(s => `${s.color}33 ${s.from * 100}% ${s.to * 100}%`) // '33' adds ~20% opacity
-        .join(', ')})`
-    : undefined;
+    const segments = getSlotBusySegments(
+      time,
+      date,
+      busySlots,
+      durationMinutes
+    ) as BusySegment[];
 
-  return (
-  <button
-    key={time}
-    onClick={() => handleSlotToggle(date, time)}
-    className={`px-3 py-2 h-[44px] text-[10px] sm:text-sm font-semibold text-center rounded-xl transition-all duration-100 shadow-[0_4px_10px_rgba(0,0,0,0.25)] border ${
-  isSelected
-    ? 'bg-green-500 text-white'
-    : 'text-gray-800 hover:bg-gray-100'
-}`}
-    style={{
-      background: isSelected ? undefined : backgroundGradient,
-    }}
-  >
-    <div className="flex items-center justify-center gap-1">
-      <span
-  className={`whitespace-nowrap ${
-    durationMinutes <= 10 ? 'text-[11px] sm:text-sm' : 'text-sm sm:text-base'
-  }`}
->
-  {`${time} - ${endTime}`}
-</span>
-      {isSelected && (
-        <span className="text-white text-xs float-check">✔</span>
-      )}
-    </div>
-  </button>
-);
-}
+    return (
+      <TimeSlotButton
+        key={time}
+        label={`${time} - ${endTime}`}
+        segments={segments}
+        selected={isSelected}
+        customMode={customMode}
+        onClick={customMode ? () => handleSlotToggle(date, time) : undefined}
+      />
+    );
+  })}
 
 
-            const segments = getSlotBusySegments(time, date, busySlots, durationMinutes);
-            const gradientStyle = segments.length
-              ? {
-                  background: `linear-gradient(to right, ${segments
-                    .map(s => `${s.color} ${s.from * 100}% ${s.to * 100}%`)
-                    .join(', ')})`,
-                  color: '#fff',
-                }
-              : {};
+</div>
 
-              const isFullyGreen =
-  segments.length === 1 &&
-  segments[0].color === '#22c55e' &&
-  segments[0].from === 0 &&
-  segments[0].to === 1;
 
-  const hasRed = segments.some(s => s.color === '#ef4444');
-return (
-  <button
-    key={time}
-    className="min-w-[87px] sm:min-w-0 px-3 py-4 text-[10px] sm:text-sm font-semibold text-center rounded-xl w-full transition-all duration-100 shadow-[0_4px_10px_rgba(0,0,0,0.25)] border"
-    style={gradientStyle}
-  >
-    <div className="flex items-center justify-center gap-1">
-      <span>{`${time} - ${endTime}`}</span>
-      {isFullyGreen ? (
-        <span className="text-white text-xs float-check">✔</span>
-      ) : hasRed ? (
-        <span className="text-white text-xs">✘</span>
-      ) : null}
-    </div>
-  </button>
-);
-          })}
-        </div>
+
       </div>
 
       {customMode && (
@@ -485,15 +397,15 @@ return (
 )}
 
 
-          <button
-            onClick={handleSendOut}
-            disabled={isSending}
-            className={`mt-6 px-6 py-3 text-base sm:text-lg font-semibold rounded-xl transition-all duration-150 transform hover:scale-105 shadow-[0_8px_20px_rgba(0,0,0,0.25)] bg-green-600 text-white hover:bg-green-700 border border-green-500 ${
-              isSending ? 'opacity-70 cursor-not-allowed' : ''
-            }`}
-          >
-            {isSending ? 'Sending...' : 'Send out!'}
-          </button>
+<SubmitAndRedirectButton
+  id={idStr}
+  text="Send out!"
+  apiEndpoint="/api/save-response"
+  payload={buildPayload}
+  successHref={(theId) => `/share/${theId}`}
+  guard={() => !!idStr}
+/>
+
         </div>
       </section>
 

@@ -48,34 +48,32 @@ export default function Home() {
             </button>
           </div>
         ) : (
-          <div className="flex flex-col items-center space-y-4 mb-10 sm:mb-16">
-  <div className="flex flex-row space-x-4">
-    
+
+<div className="flex flex-col items-center space-y-4 mb-10 sm:mb-16">
+  {/* Sign-in buttons */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
     <button
-  onClick={() => signIn('azure-ad')}
-  className="px-5 py-3 text-base sm:text-lg font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 bg-blue-600 text-white hover:bg-blue-700 border border-blue-600 shadow-[0_8px_20px_rgba(0,0,0,0.25)]"
->
-  Sync with Outlook Calendar
-</button>
+      onClick={() => signIn('azure-ad')}
+      className="w-full sm:w-[320px] whitespace-nowrap px-5 py-3 text-base md:text-lg font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 bg-blue-600 text-white hover:bg-blue-700 border border-blue-600 shadow-[0_8px_20px_rgba(0,0,0,0.25)] text-center"
+    >
+      Sync with Outlook Calendar
+    </button>
 
-
-<button
-  onClick={() => signIn('google')}
-  className="px-5 py-3 text-base sm:text-lg font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 bg-rose-600 text-white hover:bg-rose-700 border border-rose-500 shadow-[0_8px_20px_rgba(0,0,0,0.25)]"
->
-  Sync with Google Calendar
-</button>
-
-
-
+    <button
+      onClick={() => signIn('google')}
+      className="w-full sm:w-[320px] whitespace-nowrap px-5 py-3 text-base md:text-lg font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 bg-rose-600 text-white hover:bg-rose-700 border border-rose-500 shadow-[0_8px_20px_rgba(0,0,0,0.25)] text-center"
+    >
+      Sync with Google Calendar
+    </button>
   </div>
 
+  {/* Skip button — same width, stays below */}
   <button
     onClick={() => {
       localStorage.setItem('skippedLogin', 'true');
       router.push('/create');
     }}
-    className="px-5 py-3 text-base sm:text-lg font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 bg-gray-200 text-gray-800 hover:bg-gray-300 border border-gray-200 shadow-[0_8px_20px_rgba(0,0,0,0.25)]"
+    className="w-full sm:w-[320px] whitespace-nowrap px-5 py-3 text-base md:text-lg font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 bg-gray-200 text-gray-800 hover:bg-gray-300 border border-gray-200 shadow-[0_8px_20px_rgba(0,0,0,0.25)] text-center"
   >
     Don't sync with calendar
   </button>
