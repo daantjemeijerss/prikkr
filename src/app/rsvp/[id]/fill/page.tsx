@@ -116,8 +116,12 @@ const buildPayload = async () => {
     return { id: '', name, email, selections: {} };
   }
 
-  localStorage.setItem(`prikkr-name-${id}`, name);
-  localStorage.setItem(`prikkr-email-${id}`, email);
+  // Normalize inputs (helps with backend constraints / indexes)
+  const cleanName = name.trim();
+  const cleanEmail = email.trim().toLowerCase();
+
+  localStorage.setItem(`prikkr-name-${id}`, cleanName);
+  localStorage.setItem(`prikkr-email-${id}`, cleanEmail);
 
   const fullSlots = generateSlots();
   const dates = range ? getDateRange(range.from, range.to) : [];
@@ -125,9 +129,10 @@ const buildPayload = async () => {
   let selections: Record<string, string[]> = {};
 
   if (customMode) {
+    // Convert Sets to arrays and sort for determinism
     const out: Record<string, string[]> = {};
     for (const [date, set] of Object.entries(manualSelections)) {
-      out[date] = Array.from(set);
+      out[date] = Array.from(set).filter(Boolean).sort();
     }
     selections = out;
   } else {
@@ -138,7 +143,7 @@ const buildPayload = async () => {
 
       for (const time of fullSlots) {
         if (time === 'All Day' || time === '~All Day') {
-          // DAILY HANDLING (no HH:mm here)
+          // DAILY handling (same as S page approach)
           const dayStart = DateTime.fromISO(`${date}T00:00:00`, { zone: 'Europe/Amsterdam' });
           const dayEnd = dayStart.plus({ days: 1 });
           const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
@@ -166,13 +171,25 @@ const buildPayload = async () => {
         }
       }
 
-      if (available.length > 0) computed[date] = available;
+      if (available.length > 0) computed[date] = available.sort();
     }
 
     selections = computed;
   }
 
-  return { id, name, email, selections, isCreator: false };
+  // Client-side guard: many backends reject empty selections
+  if (!selections || Object.keys(selections).length === 0) {
+    throw new Error('No selections to save (pick something or switch to “Use current availability”).');
+  }
+
+  // EXACT shape expected by /api/save-response (same as S page, just isCreator:false)
+  return {
+    id,
+    name: cleanName,
+    email: cleanEmail,
+    selections,
+    isCreator: false,
+  };
 };
 
 
