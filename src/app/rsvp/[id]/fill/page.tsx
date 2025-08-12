@@ -433,10 +433,6 @@ const grouped =
         </div>
       ));
 
-const canSubmit = useMemo(
-  () => Boolean(idStr && name.trim() && email.trim()),
-  [idStr, name, email]
-);
 
 
 return <>{grouped}</>;
@@ -448,9 +444,10 @@ return <>{grouped}</>;
   apiEndpoint="/api/save-response"
   payload={buildPayload}
   successHref={(theId) => `/rsvp/${theId}/results_rsvp`}
-  guard={() => canSubmit}
-  disabled={!canSubmit}
+  guard={() => !!idStr}
+  disabled={!idStr}
 />
+
 
       </div>
     </section>
