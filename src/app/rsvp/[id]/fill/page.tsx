@@ -161,8 +161,12 @@ const buildPayload = async () => {
             .reduce((sum, b) => sum + (b.end - b.start), 0);
 
           const freeRatio = 1 - busyDur / totalMinutes;
-          if (freeRatio >= 1) available.push('All Day');
-          else if (freeRatio >= 0.8) available.push('~All Day');
+          // For RSVP responses we only ever send "All Day" when fully free.
+// Do NOT send "~All Day" from RSVP; backend often disallows it.
+if (freeRatio >= 1) {
+  available.push('All Day');
+}
+
         } else {
           // NON-DAILY
           const segments = getSlotBusySegments(time, date, busySlots, durationMinutes);
@@ -176,6 +180,19 @@ const buildPayload = async () => {
 
     selections = computed;
   }
+
+  // Remove "~All Day" if it sneaks in and drop empty days
+for (const [d, arr] of Object.entries(selections)) {
+  const cleaned = arr.filter((t) => t && t !== '~All Day');
+  if (cleaned.length) selections[d] = cleaned;
+  else delete selections[d];
+}
+
+// Don’t send an empty response object (backend returns 4xx/5xx)
+if (Object.keys(selections).length === 0) {
+  throw new Error('Please pick at least one day or time before sending.');
+}
+
 
   // Client-side guard: many backends reject empty selections
   if (!selections || Object.keys(selections).length === 0) {
