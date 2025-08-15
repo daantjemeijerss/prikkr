@@ -58,7 +58,7 @@ export function SubmitAndRedirectButton({
   apiEndpoint: string;
   payload: Record<string, any> | (() => Record<string, any> | Promise<Record<string, any>>);
   successHref: string | ((id: string) => string);
-  guard?: () => boolean;
+  guard?: boolean | (() => boolean);          // ← accept boolean too
   className?: string;
   onError?: (err: unknown) => void;
   onSuccess?: () => void;
@@ -66,9 +66,11 @@ export function SubmitAndRedirectButton({
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
+  const canGo = typeof guard === 'function' ? guard() : guard ?? true;
+  const isDisabled = disabled || isLoading || !canGo;
+
   async function handleClick() {
-    if (isLoading) return;
-    if (guard && !guard()) return;
+    if (isDisabled) return;
 
     setIsLoading(true);
     try {
@@ -85,25 +87,43 @@ export function SubmitAndRedirectButton({
         throw new Error(`save failed: ${res.status} ${msg}`);
       }
 
-      const resolvedId = (body && typeof body === 'object' && (body as any).id) || id || '';
-      const href = typeof successHref === 'function' ? successHref(resolvedId) : successHref;
+      // Prefer API response id; fall back to body.id; then prop id
+      let nextId: string | undefined;
+      try {
+        const json = await res.clone().json();
+        nextId = json?.id;
+      } catch { /* non-JSON ok */ }
+      nextId ||= (body as any)?.id || id;
 
-      if (href) router.push(href);
+      if (!nextId) throw new Error('Missing id for redirect');
+
+      const href = typeof successHref === 'function' ? successHref(nextId) : successHref;
+      if (!href) throw new Error('Missing successHref');
+
+      router.push(href);
       onSuccess?.();
     } catch (err) {
       console.error('❌ Submit failed:', err);
       onError?.(err);
+      if (!onError) alert(String(err));
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <BaseActionButton onClick={handleClick} isLoading={isLoading} disabled={disabled} className={className}>
+    <BaseActionButton
+      onClick={handleClick}
+      isLoading={isLoading}
+      disabled={isDisabled}
+      className={className}
+      title={typeof guard === 'function' ? undefined : (!canGo ? 'Fill in name and email first' : undefined)}
+    >
       {text}
     </BaseActionButton>
   );
 }
+
 
 /* =========================
    Shared date/time helpers
