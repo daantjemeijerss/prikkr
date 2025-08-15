@@ -109,16 +109,41 @@ useEffect(() => {
   return slots;
 };
 
+function dayAvailabilityLabel(dateISO: string): 'All Day' | '~All Day' | null {
+  // Whole-day window in Amsterdam
+  const dayStart = DateTime.fromISO(`${dateISO}T00:00:00`, { zone: 'Europe/Amsterdam' });
+  const dayEnd = dayStart.plus({ days: 1 });
+  const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
+
+  // Convert busy events into the same zone to avoid TZ drift
+  const overlapping = busySlots
+    .map(({ start, end }) => {
+      const bs = DateTime.fromISO(start, { zone: 'Europe/Amsterdam' });
+      const be = DateTime.fromISO(end, { zone: 'Europe/Amsterdam' });
+      return {
+        start: Math.max(0, bs.diff(dayStart, 'minutes').minutes),
+        end: Math.min(totalMinutes, be.diff(dayStart, 'minutes').minutes),
+      };
+    })
+    .filter(({ start, end }) => start < end);
+
+  const busyDur = overlapping.reduce((sum, b) => sum + (b.end - b.start), 0);
+  const freeRatio = 1 - busyDur / totalMinutes;
+
+  // Tolerances: treat ≥ 99.9% as fully free in case of rounding
+  if (freeRatio >= 0.999) return 'All Day';
+  if (freeRatio >= 0.8)   return '~All Day';   // your "half person" bucket
+  return null;
+}
+
+
 const buildPayload = async () => {
-  // read the freshest id straight from the URL
   const rsvpId = typeof params?.id === 'string' ? params.id : undefined;
   if (!rsvpId) throw new Error('Missing RSVP id in URL.');
 
-  // Normalize inputs
   const cleanName = name.trim();
   const cleanEmail = email.trim().toLowerCase();
 
-  // Persist name/email per-RSVP
   localStorage.setItem(`prikkr-name-${rsvpId}`, cleanName);
   localStorage.setItem(`prikkr-email-${rsvpId}`, cleanEmail);
 
@@ -128,37 +153,49 @@ const buildPayload = async () => {
   let selections: Record<string, string[]> = {};
 
   if (customMode) {
+    // Manual: Sets -> arrays
     const out: Record<string, string[]> = {};
     for (const [date, set] of Object.entries(manualSelections)) {
       out[date] = Array.from(set).filter(Boolean).sort();
     }
     selections = out;
   } else {
+    // Use current availability
     const computed: Record<string, string[]> = {};
+
     for (const date of dates) {
       const available: string[] = [];
-      for (const time of fullSlots) {
-        if (time === 'All Day' || time === '~All Day') {
-          // Same daily logic you already had …
-          // (keep your existing daily code here)
-        } else {
-          const segments = getSlotBusySegments(time, date, busySlots, durationMinutes);
-          const isFree = !segments.some(s => s.color === '#ef4444');
+
+      if (slotDuration === 'daily' || slotDuration === '1440') {
+        const label = dayAvailabilityLabel(date);     // <- single source of truth
+        if (label) available.push(label);             // 'All Day' or '~All Day'
+      } else {
+        for (const time of fullSlots) {
+          const segs = getSlotBusySegments(time, date, busySlots, durationMinutes);
+          const isFree = !segs.some(s => s.color === '#ef4444');
           if (isFree) available.push(time);
         }
       }
+
       if (available.length) computed[date] = available.sort();
     }
+
     selections = computed;
   }
 
-  // sanitize
+  // Final cleanup (keep "~All Day"!)
   for (const [d, arr] of Object.entries(selections)) {
-    const cleaned = arr.filter(t => t && t !== '~All Day');
+    const cleaned = arr.filter(Boolean);
     if (cleaned.length) selections[d] = cleaned;
     else delete selections[d];
   }
-  if (Object.keys(selections).length === 0) throw new Error('Please pick at least one day or time.');
+
+  if (Object.keys(selections).length === 0) {
+    throw new Error('Please pick at least one day or time.');
+  }
+
+  // Helpful debug (remove later)
+  console.log('🟢 RSVP selections →', selections);
 
   return {
     id: rsvpId,
@@ -168,6 +205,7 @@ const buildPayload = async () => {
     isCreator: false,
   };
 };
+
 
 
 return (
@@ -316,8 +354,10 @@ const grouped =
                       const busyDuration = overlappingBusy.reduce((sum, b) => sum + (b.end - b.start), 0);
                       const freeRatio = 1 - busyDuration / totalMinutes;
 
-                      const isFullyFree = freeRatio === 1;
-                      const isMostlyFree = freeRatio >= 0.8;
+const label = dayAvailabilityLabel(date);     // 'All Day' | '~All Day' | null
+const isFullyFree  = label === 'All Day';
+const isMostlyFree = label === '~All Day';
+
                       const dateLabel = DateTime.fromISO(date).toFormat('ccc dd LLL');
 
                       return (
