@@ -41,6 +41,18 @@ export default function PrikkrPage() {
   const [customMode, setCustomMode] = useState(false);
   const [manualSelections, setManualSelections] = useState<Record<string, Set<string>>>({});
 
+  // new state to hold fallbacks when not logged in
+const [fallbackEmail, setFallbackEmail] = useState<string | null>(null);
+const [fallbackName, setFallbackName] = useState<string | null>(null);
+
+useEffect(() => {
+  if (!idStr) return;
+  try {
+    setFallbackEmail(localStorage.getItem(`creatorEmail-${idStr}`));
+    setFallbackName(localStorage.getItem(`creatorName-${idStr}`));
+  } catch {}
+}, [idStr]);
+
 
   useEffect(() => {
     const id = params?.id;
@@ -124,20 +136,24 @@ useEffect(() => {
     });
   };
 
-  const buildPayload = () => {
+const buildPayload = () => {
   const id = idStr;
-  const userName = session?.user?.name || session?.user?.email || 'Anonymous';
-  if (!id) {
-    console.error('❌ Missing or invalid id');
-    return { id: '', name: userName, email: session?.user?.email, selections: {}, isCreator: true };
-  }
+  const name =
+    session?.user?.name ||
+    fallbackName ||
+    session?.user?.email ||
+    'Anonymous';
 
+  // IMPORTANT: email must exist for the API
+  const email = session?.user?.email || fallbackEmail || '';
+
+  // compute selections (your existing code) ...
   let serialized: Record<string, string[]> = {};
 
   if (customMode) {
     const out: Record<string, string[]> = {};
     for (const [date, times] of Object.entries(manualSelections)) {
-      out[date] = Array.from(times);
+      out[date] = Array.from(times).map(t => (t === '~All Day' ? 'All Day' : t));
     }
     serialized = out;
   } else {
@@ -147,49 +163,42 @@ useEffect(() => {
 
       for (const time of fullSlots) {
         if (time === 'All Day') {
-          const dayStart = DateTime.fromISO(date + 'T00:00:00', { zone: 'Europe/Amsterdam' });
-          const dayEnd = dayStart.plus({ days: 1 });
-          const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
+  // Compute the fraction of the day that is free
+  const dayStart = DateTime.fromISO(`${date}T00:00:00`, { zone: 'Europe/Amsterdam' });
+  const dayEnd   = dayStart.plus({ days: 1 });
+  const totalMin = dayEnd.diff(dayStart, 'minutes').minutes;
 
-          const busyDur = busySlots
-            .map(({ start, end }) => {
-              const busyStart = DateTime.fromISO(start);
-              const busyEnd = DateTime.fromISO(end);
-              return {
-                start: Math.max(0, busyStart.diff(dayStart, 'minutes').minutes),
-                end: Math.min(totalMinutes, busyEnd.diff(dayStart, 'minutes').minutes),
-              };
-            })
-            .filter(({ start, end }) => start < end)
-            .reduce((sum, b) => sum + (b.end - b.start), 0);
+  const busyMin = busySlots
+    .map(({ start, end }) => {
+      const bStart = DateTime.fromISO(start);
+      const bEnd   = DateTime.fromISO(end);
+      const s = Math.max(0, bStart.diff(dayStart, 'minutes').minutes);
+      const e = Math.min(totalMin, bEnd.diff(dayStart, 'minutes').minutes);
+      return Math.max(0, e - s); // clamp negatives
+    })
+    .reduce((acc, m) => acc + m, 0);
 
-          const freeRatio = 1 - busyDur / totalMinutes;
+  const freeRatio = 1 - busyMin / totalMin;
 
-          if (freeRatio >= 1) {
-            availableSlots.push('All Day');
-          } else if (freeRatio >= 0.8) {
-            availableSlots.push('~All Day'); // keep your maybe semantics
-          }
-        } else {
+  if (freeRatio >= 1) availableSlots.push('All Day');
+  else if (freeRatio >= 0.8) availableSlots.push('All Day'); // treat "~All Day" as "All Day" in payload
+}
+else {
           const busy = isSlotBusy(time, date, busySlots, durationMinutes);
           if (!busy) availableSlots.push(time);
         }
       }
-
-      if (availableSlots.length > 0) {
-        computed[date] = availableSlots;
-      }
+      if (availableSlots.length) computed[date] = availableSlots;
     }
     serialized = computed;
   }
 
-  return {
-    id,
-    name: userName,
-    email: session?.user?.email,
-    selections: serialized,
-    isCreator: true,
-  };
+  // FINAL safeguard – match API expectations
+  if (!id || !email || !Object.keys(serialized).length) {
+    console.error('Payload missing fields', { id, name, email, serialized });
+  }
+
+  return { id, name, email, selections: serialized, isCreator: true };
 };
 
 
@@ -403,8 +412,9 @@ useEffect(() => {
   apiEndpoint="/api/save-response"
   payload={buildPayload}
   successHref={(theId) => `/share/${theId}`}
-  guard={() => !!idStr}
+  guard={() => !!idStr && (!!session?.user?.email || !!fallbackEmail)}
 />
+
 
         </div>
       </section>

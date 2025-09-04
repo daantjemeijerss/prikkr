@@ -95,6 +95,8 @@ slotType: slotDuration === 'custom'
       }
 
       localStorage.setItem(`creatorEmail-${id}`, creatorEmail);
+      localStorage.setItem(`creatorName-${id}`, creatorName);
+
 
       const defaultSelections: Record<string, string[]> = {};
       const currentDate = new Date(from);
