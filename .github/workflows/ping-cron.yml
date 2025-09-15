@@ -1,0 +1,24 @@
+name: Ping refresh endpoint
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes (UTC)
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping one or more Prikkr IDs
+        env:
+          BASE_URL: https://YOUR-PROD-DOMAIN.vercel.app
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          PRIKKR_IDS: ${{ secrets.PRIKKR_IDS }}  # comma-separated list of ids
+        run: |
+          IFS=',' read -ra IDS <<< "$PRIKKR_IDS"
+          for ID in "${IDS[@]}"; do
+            echo "Pinging $BASE_URL/api/cron/refresh/$CRON_SECRET?id=$ID"
+            curl -fsS "$BASE_URL/api/cron/refresh/$CRON_SECRET?id=$ID"
+            echo
+          done
+
