@@ -1,4 +1,4 @@
-name: Ping refresh endpoint
+name: Auto-refresh all Prikkrs
 
 on:
   schedule:
@@ -8,17 +8,50 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
+    env:
+      BASE_URL: ${{ vars.BASE_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
+      KV_REST_API_TOKEN: ${{ secrets.KV_REST_API_TOKEN }}
     steps:
-      - name: Ping one or more Prikkr IDs
-        env:
-          BASE_URL: https://YOUR-PROD-DOMAIN.vercel.app
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          PRIKKR_IDS: ${{ secrets.PRIKKR_IDS }}  # comma-separated list of ids
+      - name: Discover all meta:* keys via KV REST and call refresh
+        shell: bash
         run: |
-          IFS=',' read -ra IDS <<< "$PRIKKR_IDS"
-          for ID in "${IDS[@]}"; do
-            echo "Pinging $BASE_URL/api/cron/refresh/$CRON_SECRET?id=$ID"
-            curl -fsS "$BASE_URL/api/cron/refresh/$CRON_SECRET?id=$ID"
-            echo
+          set -euo pipefail
+
+          cursor=0
+          ids=()
+
+          # Scan all keys that match meta:* (loop until cursor returns to 0)
+          while : ; do
+            RESP=$(curl -fsS \
+              -H "Authorization: Bearer $KV_REST_API_TOKEN" \
+              "$KV_REST_API_URL/scan?cursor=${cursor}&match=meta:*&count=200")
+
+            # Expecting: {"cursor": "123","keys":["meta:abc","meta:def",...]} OR {"cursor":123,"result":["meta:abc",...]}
+            new_cursor=$(echo "$RESP" | jq -r '.cursor // .Cursor // .cursor')
+            # Keys array may be "keys" or "result" depending on provider
+            keys=$(echo "$RESP" | jq -r '.keys // .result | .[]')
+
+            # Extract IDs (after "meta:")
+            while IFS= read -r k; do
+              id="${k#meta:}"
+              [ -n "$id" ] && ids+=("$id")
+            done <<< "$keys"
+
+            # Break if scan is complete
+            if [ "$new_cursor" = "0" ] || [ "$new_cursor" = "null" ]; then
+              break
+            fi
+            cursor="$new_cursor"
           done
 
+          echo "Found ${#ids[@]} IDs"
+
+          # Call your existing per-id endpoint
+          for id in "${ids[@]}"; do
+            url="$BASE_URL/api/cron/refresh/$CRON_SECRET?id=$id"
+            echo "GET $url"
+            curl -fsS "$url"
+            echo
+          done
