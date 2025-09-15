@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {fetchOutlookBusy} from '@/calendar/fetchOutlookBusy';
@@ -31,6 +31,7 @@ export default function RSVPFillPage() {
   const idStr = typeof params?.id === 'string' ? params.id : undefined;
   const router = useRouter();
   const { data: session } = useSession();
+  const calledUpsert = useRef(false);
   const [range, setRange] = useState<{ from: string; to: string } | null>(null);
   const [extendedHours, setExtendedHours] = useState(false);
   const [slotDuration, setSlotDuration] = useState<string>('60');
@@ -66,6 +67,22 @@ const canSubmit = useMemo(
         setSlotDuration(String(slotDuration || '60'));
       });
   }, [params]);
+
+  useEffect(() => {
+  // Only run after the user is authenticated, only once per mount
+  if (!session || calledUpsert.current === true) return;
+
+  calledUpsert.current = true;
+
+  // Auto opt-in; later you can gate this behind a checkbox
+  fetch('/api/participants/upsert', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: params?.id, optIn: true }),
+    credentials: 'include', // ensure cookies/JWT are sent
+  }).catch(() => { /* ignore in UI */ });
+}, [session, params?.id]);
+
 
 useEffect(() => {
   if (!range) return;

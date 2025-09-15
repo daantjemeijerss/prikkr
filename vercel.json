@@ -1,3 +1,9 @@
 {
-  "regions": ["fra1"]
+  "regions": ["fra1"],
+  "crons": [
+    {
+      "path": "/api/cron/refresh/aea99c89-eb09-4124-ae04-d50f26188a39", 
+      "schedule": "*/15 * * * *"
+    }
+  ]
 }
