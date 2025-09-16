@@ -75,3 +75,13 @@ export async function getParticipants(id: string): Promise<Participant[]> {
 export async function setParticipants(id: string, arr: Participant[]) {
   await kv.set(`participants:${id}`, arr);
 }
+
+// Track last cron sync timestamp per Prikkr
+export async function setLastSync(id: string, isoTime: string) {
+  await kv.set(`lastsync:${id}`, isoTime);
+}
+
+export async function getLastSync(id: string): Promise<string | null> {
+  const v = await kv.get<string>(`lastsync:${id}`);
+  return (typeof v === 'string') ? v : null;
+}
