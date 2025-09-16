@@ -1,3 +1,4 @@
+// src/app/api/save-meta/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
 import nodemailer from 'nodemailer';
@@ -5,43 +6,31 @@ import nodemailer from 'nodemailer';
 async function sendResultsEmail(to: string, name: string, eventName: string, id: string) {
   const shareLink = `https://prikkr.com/rsvp/${id}/login`;
   const resultsLink = `https://prikkr.com/results/${id}`;
-  const validUntil = new Date();
-  validUntil.setFullYear(validUntil.getFullYear() + 1);
+  const validUntil = new Date(); validUntil.setFullYear(validUntil.getFullYear() + 1);
   const validDate = validUntil.toISOString().split('T')[0];
 
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    service: 'gmail',           // or host: 'smtp.gmail.com', port: 465, secure: true
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+      pass: process.env.EMAIL_PASS, // use a Gmail App Password (see step 2)
     },
   });
 
-  const mailOptions = {
+  await transporter.sendMail({
     from: `Prikkr <${process.env.EMAIL_USER}>`,
     to,
     subject: `Your Prikkr: ${eventName}`,
     html: `
-      <div style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5;">
-        <img src="https://prikkr.vercel.app/images/prikkr_logo_transparent.png" alt="Prikkr logo" style="height: 60px; margin-bottom: 20px;" />
+      <div style="font-family:Arial,sans-serif;font-size:16px;line-height:1.5">
         <p>Hi ${name || 'there'},</p>
-        <p>You just created a new <strong>Prikkr</strong> event: <strong>${eventName}</strong></p>
-
-        <p>🧑‍🤝‍🧑 <strong>Invite other people</strong> with this link:<br/>
-        <a href="${shareLink}" style="color: #2563eb;">${shareLink}</a></p>
-
-        <p>📊 <strong>View availability responses</strong> here:<br/>
-        <a href="${resultsLink}" style="color: #2563eb;">${resultsLink}</a></p>
-
-        <p>🗓️ This link will be valid until: <strong>${validDate}</strong></p>
-
-        <br />
-        <p>Thank you for using 📌Prikkr!<br/>— The Prikkr Team</p>
+        <p>You created <strong>${eventName}</strong>.</p>
+        <p>Invite others: <a href="${shareLink}">${shareLink}</a></p>
+        <p>View results: <a href="${resultsLink}">${resultsLink}</a></p>
+        <p>Valid until <strong>${validDate}</strong></p>
       </div>
     `,
-  };
-
-  await transporter.sendMail(mailOptions);
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -49,40 +38,35 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { id, range, extendedHours, slotDuration, creatorEmail, creatorName, eventName } = body;
 
-    console.log('🆔 Received ID:', id);
-    console.log('📩 Email:', creatorEmail);
-    console.log('🌍 Running in environment:', process.env.NODE_ENV);
-
     if (!id || !range || typeof extendedHours !== 'boolean' || !creatorEmail || !eventName) {
-      console.warn('❌ Missing required fields');
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const data = {
+    const payload = {
       range,
       extendedHours,
       slotDuration,
       creatorEmail,
       creatorName,
       eventName,
-      createdAt: Date.now()  // 🕒 Add timestamp for auto-deletion
+      createdAt: Date.now(),
     };
 
-    const redisKey = `meta:${id}`;
-    const redisValue = JSON.stringify(data);
+    // Save to KV first (object, no stringify needed)
+    await kv.set(`meta:${id}`, payload);
 
-    console.log('🔑 Redis Key:', redisKey);
-    console.log('📦 Redis Value:', redisValue);
+    // Try email, but don’t let failure break creation
+    let emailOk = true;
+    try {
+      await sendResultsEmail(creatorEmail, creatorName, eventName, id);
+    } catch (e: any) {
+      emailOk = false;
+      console.error('sendResultsEmail failed:', e?.message || e);
+    }
 
-    const result = await kv.set(redisKey, redisValue);
-    console.log('✅ KV save result:', result);
-
-    await sendResultsEmail(creatorEmail, creatorName, eventName, id);
-
-    console.log('📤 Returning success');
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error('❌ Error saving metadata:', err);
+    return NextResponse.json({ ok: true, emailOk });
+  } catch (err: any) {
+    console.error('save-meta error:', err?.message || err);
     return NextResponse.json({ error: 'Failed to save metadata' }, { status: 500 });
   }
 }
