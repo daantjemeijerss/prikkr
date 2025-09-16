@@ -22,36 +22,37 @@ jobs:
           cursor=0
           ids=()
 
-          # Scan all keys that match meta:* (loop until cursor returns to 0)
           while : ; do
-            RESP=$(curl -fsS \
-              -H "Authorization: Bearer $KV_REST_API_TOKEN" \
-              "$KV_REST_API_URL/scan?cursor=${cursor}&match=meta:*&count=200")
+            if [[ "$KV_REST_API_URL" == *"upstash.io"* ]]; then
+              # --- Upstash shape ---
+              RESP=$(curl -fsS \
+                -H "Authorization: Bearer $KV_REST_API_TOKEN" \
+                "$KV_REST_API_URL/scan/${cursor}?match=meta:*&count=200")
+              new_cursor=$(echo "$RESP" | jq -r '.result[0]')
+              keys=$(echo "$RESP" | jq -r '.result[1][]?')
+            else
+              # --- Vercel KV shape ---
+              RESP=$(curl -fsS \
+                -H "Authorization: Bearer $KV_REST_API_TOKEN" \
+                "$KV_REST_API_URL/scan?cursor=${cursor}&match=meta:*&count=200")
+              new_cursor=$(echo "$RESP" | jq -r '.cursor // .Cursor // "0"')
+              keys=$(echo "$RESP" | jq -r '.keys[]?')
+            fi
 
-            # Expecting: {"cursor": "123","keys":["meta:abc","meta:def",...]} OR {"cursor":123,"result":["meta:abc",...]}
-            new_cursor=$(echo "$RESP" | jq -r '.cursor // .Cursor // .cursor')
-            # Keys array may be "keys" or "result" depending on provider
-            keys=$(echo "$RESP" | jq -r '.keys // .result | .[]')
-
-            # Extract IDs (after "meta:")
             while IFS= read -r k; do
-              id="${k#meta:}"
-              [ -n "$id" ] && ids+=("$id")
+              [[ -n "$k" ]] || continue
+              ids+=("${k#meta:}")
             done <<< "$keys"
 
-            # Break if scan is complete
-            if [ "$new_cursor" = "0" ] || [ "$new_cursor" = "null" ]; then
-              break
-            fi
+            [[ -z "$new_cursor" || "$new_cursor" == "0" || "$new_cursor" == "null" ]] && break
             cursor="$new_cursor"
           done
 
           echo "Found ${#ids[@]} IDs"
 
-          # Call your existing per-id endpoint
           for id in "${ids[@]}"; do
             url="$BASE_URL/api/cron/refresh/$CRON_SECRET?id=$id"
             echo "GET $url"
-            curl -fsS "$url"
-            echo
+            curl -fsS "$url" >/dev/null
+            echo " ok"
           done
