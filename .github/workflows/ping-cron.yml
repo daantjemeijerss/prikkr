@@ -2,7 +2,7 @@ name: Auto-refresh ACTIVE Prikkrs
 
 on:
   schedule:
-    - cron: "0 * * * *"   # every hour (UTC). Change if you want.
+    - cron: "0 * * * *"   # every hour (UTC)
   workflow_dispatch:
 
 jobs:
@@ -14,30 +14,28 @@ jobs:
       KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
       KV_REST_API_TOKEN: ${{ secrets.KV_REST_API_TOKEN }}
       # --- tuning knobs ---
-      ACTIVE_DAYS: "7"       # consider a Prikkr active if touched within N days
-      ACTIVE_STATUSES: "collecting,open,active"  # comma-separated allowed statuses
+      ACTIVE_DAYS: "7"                          # active if touched within N days
+      ACTIVE_STATUSES: "collecting,open,active" # comma-separated allowed statuses
     steps:
       - name: Discover ACTIVE meta:* keys via KV REST and call refresh (with jitter)
         shell: bash
         run: |
           set -euo pipefail
 
+          # rand_sleep MIN_MS MAX_MS  (default 100..500)
           rand_sleep() {
-            # sleep between $1 and $2 milliseconds (default 100..500)
-            local min_ms=${1:-100}
-            local max_ms=${2:-500}
+            local min_ms="${1:-100}"
+            local max_ms="${2:-500}"
             local span=$(( max_ms - min_ms ))
-            local r=$(( RANDOM % (span+1) + min_ms ))
-            # convert ms to seconds with 3 decimals
-            python3 - <<PY
-import time
-time.sleep(${r}/1000.0)
-PY
+            local r=$(( RANDOM % (span + 1) + min_ms ))   # milliseconds
+            # convert ms -> seconds with 3 decimals; GNU sleep accepts decimals
+            local secs
+            secs=$(awk -v r="$r" 'BEGIN{printf "%.3f", r/1000}')
+            sleep "$secs"
           }
 
           # -------- initial jitter so all repos don't thundering-herd at :00 --------
-          # sleep 5..35 seconds
-          initial=$(( RANDOM % 31 + 5 ))
+          initial=$(( RANDOM % 31 + 5 ))  # 5..35 seconds
           echo "Initial jitter: sleeping ${initial}s..."
           sleep "${initial}s"
 
@@ -79,19 +77,15 @@ PY
             if [[ "$KV_REST_API_URL" == *"upstash.io"* ]]; then
               RESP=$(curl -fsS -H "Authorization: Bearer $KV_REST_API_TOKEN" \
                 "$KV_REST_API_URL/get/${key}")
-              # Upstash returns {"result":"<string or json>"}
               echo "$RESP" | jq -r '.result' 2>/dev/null
             else
-              # Try Vercel KV common shapes
               if RESP=$(curl -fsS -H "Authorization: Bearer $KV_REST_API_TOKEN" \
                     "$KV_REST_API_URL/get/${key}" 2>/dev/null); then
                 :
               else
-                # Fallback older shape: /get?key=...
                 RESP=$(curl -fsS -H "Authorization: Bearer $KV_REST_API_TOKEN" \
                     "$KV_REST_API_URL/get?key=${key}")
               fi
-              # Vercel KV returns {"result": "..."} or {"value": "..."} depending on version
               echo "$RESP" | jq -r '.result // .value' 2>/dev/null
             fi
           }
@@ -99,85 +93,57 @@ PY
           # -------- filter: keep only ACTIVE prikkrs --------
           active_ids=()
           now_epoch=$(date -u +%s)
-          limit_days="${ACTIVE_DAYS}"
-          limit_secs=$(( limit_days * 86400 ))
-
-          # Build allowed status regex from comma list (collecting|open|active)
-          allowed_statuses=$(echo "$ACTIVE_STATUSES" | sed 's/,/|/g')
+          limit_secs=$(( ${ACTIVE_DAYS} * 86400 ))
+          allowed_statuses_regex=$(echo "$ACTIVE_STATUSES" | sed 's/,/|/g')
 
           for key in "${keys[@]}"; do
             meta_raw=$(get_meta_json "$key" || true)
             [[ -z "$meta_raw" || "$meta_raw" == "null" ]] && continue
 
-            # meta_raw is typically a JSON string; ensure it's JSON (if already JSON, this is a no-op)
-            if ! meta=$(echo "$meta_raw" | jq -er '. | try (type=="string")' 2>/dev/null); then
-              meta_json="$meta_raw"
-            else
-              # decode JSON string into object
-              meta_json=$(echo "$meta_raw" | jq -r 'try fromjson catch empty')
-              if [[ -z "$meta_json" ]]; then
-                # last resort: treat raw as json already
-                meta_json="$meta_raw"
-              fi
-            fi
+            # meta may be stored as a JSON string or as an object; normalize to object
+            meta_json=$(echo "$meta_raw" | jq -r 'try (type=="string") as $s | (if $s then fromjson else . end) catch empty')
+            [[ -z "$meta_json" ]] && meta_json="$meta_raw"
 
-            # pull fields we care about
             status=$(echo "$meta_json" | jq -r '.status // .phase // empty')
             lastTouched=$(echo "$meta_json" | jq -r '.lastViewedAt // .updatedAt // .createdAt // empty')
             rangeTo=$(echo "$meta_json" | jq -r '.range.to // empty')
 
             # status filter
             if [[ -n "$status" ]]; then
-              if ! echo "$status" | grep -Eiq "^(${allowed_statuses})$"; then
-                # e.g. "closed", "finalized", "archived" -> skip
+              if ! echo "$status" | grep -Eiq "^(${allowed_statuses_regex})$"; then
                 continue
               fi
             fi
 
             # recency filter
-            ts="${lastTouched}"
-            if [[ -z "$ts" ]]; then
-              # if we don't have timestamps, keep it to be safe
-              is_recent=1
-            else
-              if ts_epoch=$(date -u -d "$ts" +%s 2>/dev/null); then
+            keep_recent=1
+            if [[ -n "$lastTouched" ]]; then
+              if ts_epoch=$(date -u -d "$lastTouched" +%s 2>/dev/null); then
                 age=$(( now_epoch - ts_epoch ))
-                is_recent=$(( age <= limit_secs ? 1 : 0 ))
-              else
-                # unparseable -> keep
-                is_recent=1
+                (( age <= limit_secs )) || keep_recent=0
               fi
             fi
-            [[ "$is_recent" -eq 0 ]] && continue
+            (( keep_recent == 1 )) || continue
 
-            # optional: if date range already ended long ago, skip
+            # optional: skip very old ranges (>30d past)
             if [[ -n "$rangeTo" ]]; then
               if to_epoch=$(date -u -d "$rangeTo" +%s 2>/dev/null); then
-                # keep if ends within 30 days in the past
-                if (( now_epoch - to_epoch > 30*86400 )); then
-                  continue
-                fi
+                (( now_epoch - to_epoch <= 30*86400 )) || continue
               fi
             fi
 
-            # passed filters → collect id
-            id="${key#meta:}"
-            active_ids+=("$id")
+            active_ids+=("${key#meta:}")
           done
 
-          # Nothing to do?
           if [[ ${#active_ids[@]} -eq 0 ]]; then
             echo "No ACTIVE Prikkrs. Exiting."
             exit 0
           fi
 
           echo "Active IDs before shuffle: ${#active_ids[@]}"
-
-          # shuffle to avoid spiky patterns
           mapfile -t active_ids < <(printf "%s\n" "${active_ids[@]}" | shuf)
           echo "Active IDs after shuffle: ${#active_ids[@]}"
 
-          # loop with per-call jitter
           for id in "${active_ids[@]}"; do
             url="$BASE_URL/api/cron/refresh/$CRON_SECRET?id=$id"
             echo "GET $url"
