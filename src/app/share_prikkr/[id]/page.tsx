@@ -31,6 +31,7 @@ export default function SharePrikkrDatePage() {
   const eventId = searchParams.get('id') || id?.toString() || '';
   const chosenDateFormatted = formatDisplayDate(chosenDateRaw);
 
+  
   useEffect(() => {
     // Save the final date on mount
     if (!eventId || !chosenDateRaw || !chosenTime) return;
@@ -127,6 +128,8 @@ export default function SharePrikkrDatePage() {
       setSending(false);
     }
   };
+
+
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 bg-white text-gray-900">

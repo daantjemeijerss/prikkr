@@ -26,7 +26,7 @@ import {
   fixedCols,              // (ok to keep if you use elsewhere, otherwise remove)
   type BusySegment,
 } from '@/utils/Buttons';
-
+import { useTouchMeta } from '@/hooks/useTouchMeta';
 
 
 export default function PrikkrPage() {
@@ -44,6 +44,8 @@ export default function PrikkrPage() {
   // new state to hold fallbacks when not logged in
 const [fallbackEmail, setFallbackEmail] = useState<string | null>(null);
 const [fallbackName, setFallbackName] = useState<string | null>(null);
+
+useTouchMeta(idStr, 'active');
 
 useEffect(() => {
   if (!idStr) return;

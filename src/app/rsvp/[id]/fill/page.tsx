@@ -24,6 +24,7 @@ import {
   dailyColStartMdClass,
   type BusySegment,
 } from '@/utils/Buttons';
+import { useTouchMeta } from '@/hooks/useTouchMeta';
 
 
 export default function RSVPFillPage() {
@@ -48,6 +49,7 @@ const canSubmit = useMemo(
   () => Boolean(name.trim() && email.trim()),
   [name, email]
 );
+  useTouchMeta(idStr, 'active');  
 
 
   useEffect(() => {

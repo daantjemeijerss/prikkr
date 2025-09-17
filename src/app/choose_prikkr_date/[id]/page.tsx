@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { DateTime } from 'luxon';
+import { useTouchMeta } from '@/hooks/useTouchMeta';
 
 interface ResponseEntry {
   name: string;
@@ -37,7 +38,9 @@ export default function ChoosePrikkrDatePage() {
   const [extendedHours, setExtendedHours] = useState(false);
   const [sendingTarget, setSendingTarget] = useState<string | null>(null);
   const [slotDuration, setSlotDuration] = useState<string | number>('hourly');
+  const idStr = params?.id as string;
 
+  useTouchMeta(idStr, 'active');
 
   useEffect(() => {
     if (!params?.id || typeof params.id !== 'string') {

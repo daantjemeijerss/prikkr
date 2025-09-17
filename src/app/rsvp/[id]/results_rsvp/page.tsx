@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { DateTime } from 'luxon'; // At the top if not already
-
+import { useTouchMeta } from '@/hooks/useTouchMeta';
 
 interface ResponseEntry {
   name: string;
@@ -24,7 +24,9 @@ export default function ResultsPage() {
   const [range, setRange] = useState<{ from: string; to: string } | null>(null);
   const [extendedHours, setExtendedHours] = useState(false);
   const [slotDuration, setSlotDuration] = useState<string>('hourly');
-
+  const idStr = params?.id as string;                 // ← add
+  useTouchMeta(idStr, 'active'); 
+  
   useEffect(() => {
     const cached = localStorage.getItem('prikkr-meta');
     if (cached && !range) {

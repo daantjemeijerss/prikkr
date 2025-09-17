@@ -1,10 +1,8 @@
-// app/api/participants/upsert/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { getParticipants, setParticipants } from '@/lib/storage';
+import { upsertParticipant } from '@/lib/storage';
 
 export async function POST(req: NextRequest) {
-  // Read the signed NextAuth JWT from cookies (server-side)
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (!token) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -15,10 +13,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'missing id' }, { status: 400 });
   }
 
-  const email =
-    (token as any).email ??
-    (token as any).sub ??
-    '';
+  const email = (token as any).email ?? (token as any).sub ?? '';
   const name = ((token as any).name as string | undefined) ?? email;
   const provider = (token as any).provider as 'google' | 'azure-ad' | undefined;
   const access_token = (token as any).accessToken as string | undefined;
@@ -29,20 +24,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'missing session fields' }, { status: 400 });
   }
 
-  // Upsert this user into participants:{id}
-  const current = await getParticipants(id);
-  const next = current.filter(
-    p => (p.email || '').toLowerCase() !== email.toLowerCase()
-  );
-
-  next.push({
+  await upsertParticipant(id, {
     name,
     email,
-    provider, // 'google' | 'azure-ad'
+    provider,
     oauth: { access_token, refresh_token, expires_at },
     optedInForAutoSync: Boolean(optIn),
   });
 
-  await setParticipants(id, next);
-  return NextResponse.json({ ok: true, count: next.length });
+  return NextResponse.json({ ok: true });
 }

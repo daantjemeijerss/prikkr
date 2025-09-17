@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { DateTime } from 'luxon';
-
+import { useTouchMeta } from '@/hooks/useTouchMeta';
 
 interface ResponseEntry {
   name: string;
@@ -60,6 +60,9 @@ export default function ResultsPage() {
   const [isPrikkrSending, setIsPrikkrSending] = useState(false);
   const [routingTarget, setRoutingTarget] = useState<string | null>(null);
   const [slotDuration, setSlotDuration] = useState<string>('60'); // default is hourly
+
+    const idStr = params?.id as string;                 // ← add
+  useTouchMeta(idStr, 'active'); 
 
  function durationInMinutes(value: string | number): number {
   const map: Record<string, number> = {

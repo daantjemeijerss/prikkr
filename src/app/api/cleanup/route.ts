@@ -1,51 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { getToken } from 'next-auth/jwt';
+import { upsertParticipant } from '@/lib/storage';
 
-const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest) {
-  try {
-    const keys = await kv.keys('meta:*');
-
-    if (!keys || keys.length === 0) {
-      return NextResponse.json({ message: 'No meta keys found.' });
-    }
-
-    let deletedCount = 0;
-
-    for (const metaKey of keys) {
-      const id = metaKey.split(':')[1]; // from meta:abc123 → abc123
-      const metaRaw = await kv.get(metaKey);
-
-      if (!metaRaw) continue;
-
-      let meta: any;
-      try {
-        meta = typeof metaRaw === 'string' ? JSON.parse(metaRaw) : metaRaw;
-      } catch (err) {
-        console.warn(`⚠️ Skipped malformed meta for ID ${id}`);
-        continue;
-      }
-
-      const createdAt = meta?.finalSelection?.createdAt || meta?.createdAt;
-
-      if (!createdAt || typeof createdAt !== 'number') continue;
-
-      const age = Date.now() - createdAt;
-      if (age > ONE_YEAR_MS) {
-        await kv.del(`meta:${id}`);
-        await kv.del(`responses:${id}`);
-        deletedCount++;
-        console.log(`🧹 Deleted expired event: ${id}`);
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      deleted: deletedCount,
-    });
-  } catch (err) {
-    console.error('❌ Error during cleanup:', err);
-    return NextResponse.json({ error: 'Failed cleanup' }, { status: 500 });
+export async function POST(req: NextRequest) {
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  if (!token) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
+
+  const { id, optIn = true } = await req.json();
+  if (!id) {
+    return NextResponse.json({ error: 'missing id' }, { status: 400 });
+  }
+
+  const email = (token as any).email ?? (token as any).sub ?? '';
+  const name = ((token as any).name as string | undefined) ?? email;
+  const provider = (token as any).provider as 'google' | 'azure-ad' | undefined;
+  const access_token = (token as any).accessToken as string | undefined;
+  const refresh_token = (token as any).refreshToken as string | undefined;
+  const expires_at = (token as any).expiresAt as number | undefined;
+
+  if (!email || !provider || !access_token) {
+    return NextResponse.json({ error: 'missing session fields' }, { status: 400 });
+  }
+
+  await upsertParticipant(id, {
+    name,
+    email,
+    provider,
+    oauth: { access_token, refresh_token, expires_at },
+    optedInForAutoSync: Boolean(optIn),
+  });
+
+  return NextResponse.json({ ok: true });
 }

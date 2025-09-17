@@ -3,6 +3,7 @@
 import { useRouter, useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { signIn, useSession } from 'next-auth/react';
+import { useTouchMeta } from '@/hooks/useTouchMeta';  
 
 export default function RSVPLoginPage() {
   const { data: session, status } = useSession();
@@ -13,6 +14,8 @@ export default function RSVPLoginPage() {
   const [showManual, setShowManual] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+    const idStr = params?.id as string;                 // ← add
+  useTouchMeta(idStr, 'active'); 
 
   // When signed in via OAuth, copy name/email to localStorage and go to fill
   useEffect(() => {

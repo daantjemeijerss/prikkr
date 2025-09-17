@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useTouchMeta } from '@/hooks/useTouchMeta';
 
 export default function SharePage() {
   const params = useParams();
@@ -12,6 +13,9 @@ export default function SharePage() {
   const [copied, setCopied] = useState(false);
   const [copiedResults, setCopiedResults] = useState(false);
   const [validUntil, setValidUntil] = useState('');
+  const idStr = params?.id as string;
+
+  useTouchMeta(idStr, 'active'); 
 
   function formatDisplayDate(dateStr: string): string {
     const date = new Date(dateStr);
