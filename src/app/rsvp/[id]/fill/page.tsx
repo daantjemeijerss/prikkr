@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import {fetchOutlookBusy} from '@/calendar/fetchOutlookBusy';
 import {fetchGoogleBusy} from '@/calendar/fetchGoogleBusy';
 import { DateTime } from 'luxon';
 import {
@@ -89,22 +88,25 @@ const canSubmit = useMemo(
 useEffect(() => {
   if (!range) return;
 
-  const token = session?.accessToken;
-  const provider = session?.provider;
-
-  if (typeof token !== 'string') return;
-  if (provider !== 'google' && provider !== 'azure-ad') return;
+  // Note: you already expose session.accessToken & session.provider — we keep using that.
+  const provider = (session as any)?.provider;
 
   (async () => {
     if (provider === 'google') {
+      const token = (session as any)?.accessToken;
+      if (typeof token !== 'string') return;
       const slots = await fetchGoogleBusy(range.from, range.to, token);
       setBusySlots(slots);
-    } else {
-      const slots = await fetchOutlookBusy(range.from, range.to, token);
+    } else if (provider === 'azure-ad') {
+      // Outlook branch now goes through server API (auto refresh + no cache)
+      const slots = await loadOutlookBusy(range.from, range.to);
       setBusySlots(slots);
+    } else {
+      // not logged in / manual mode — leave busySlots empty
+      setBusySlots([]);
     }
   })();
-}, [range, session?.accessToken, session?.provider]);
+}, [range, session]);
 
 
 
@@ -154,6 +156,22 @@ function dayAvailabilityLabel(dateISO: string): 'All Day' | '~All Day' | null {
   if (freeRatio >= 0.8)   return '~All Day';   // your "half person" bucket
   return null;
 }
+
+// -- NEW: always fetch Outlook busy server-side (auto-refresh + no-cache)
+async function loadOutlookBusy(from: string, to: string) {
+  const res = await fetch(`/api/busy/outlook?from=${from}&to=${to}`, {
+    cache: 'no-store',
+    credentials: 'include', // send your session cookie/JWT
+    headers: { 'x-prikkr': 'refresh' }, // harmless cache-buster header
+  });
+  if (!res.ok) {
+    console.error('Failed to load Outlook busy:', await res.text());
+    return [];
+  }
+  const { busy } = await res.json();
+  return busy as TimeSlot[];
+}
+
 
 
 const buildPayload = async () => {

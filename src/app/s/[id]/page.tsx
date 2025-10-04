@@ -3,7 +3,6 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useMemo } from 'react';
-import {fetchOutlookBusy} from '@/calendar/fetchOutlookBusy';
 import {fetchGoogleBusy} from '@/calendar/fetchGoogleBusy';
 import { DateTime } from 'luxon';
 import {
@@ -77,24 +76,42 @@ useEffect(() => {
   const slotType = useMemo(() => getSlotTypeLabel(slotDuration), [slotDuration]);
   const durationMinutes = parseInt(slotDuration === 'custom' ? '60' : slotDuration);
 
+  // Always load Outlook busy via server (auto refresh + no cache)
+async function loadOutlookBusy(from: string, to: string) {
+  const res = await fetch(`/api/busy/outlook?from=${from}&to=${to}`, {
+    cache: 'no-store',
+    credentials: 'include',
+    headers: { 'x-prikkr': 'refresh' }, // harmless cache-buster
+  });
+  if (!res.ok) {
+    console.error('Failed to load Outlook busy:', await res.text());
+    return [];
+  }
+  const { busy } = await res.json();
+  return busy as TimeSlot[];
+}
 
 useEffect(() => {
   if (!range) return;
 
-  const token = session?.accessToken;
-  const provider = session?.provider;
-
-  if (typeof token !== 'string') return;
-  if (provider !== 'google' && provider !== 'azure-ad') return;
+  const provider = (session as any)?.provider;
+  const accessToken = (session as any)?.accessToken;
 
   (async () => {
-    const busy =
-      provider === 'google'
-        ? await fetchGoogleBusy(range.from, range.to, token)
-        : await fetchOutlookBusy(range.from, range.to, token);
-    setBusySlots(busy);
+    if (provider === 'google') {
+      if (typeof accessToken !== 'string') return;
+      const busy = await fetchGoogleBusy(range.from, range.to, accessToken);
+      setBusySlots(busy);
+    } else if (provider === 'azure-ad') {
+      // Outlook via server route (auto token refresh + no-store)
+      const busy = await loadOutlookBusy(range.from, range.to);
+      setBusySlots(busy);
+    } else {
+      // not logged in / manual
+      setBusySlots([]);
+    }
   })();
-}, [range, session?.accessToken, session?.provider]);
+}, [range, session]);
 
 
   const generateSlots = () => {
