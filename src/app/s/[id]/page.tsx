@@ -48,6 +48,32 @@ const { busySegments } = useBusySegments({
   session,
 });
 
+useEffect(() => {
+  if (!idStr) return;
+
+  // require a logged-in provider so the route can read tokens from the session cookie
+  const provider = (session as any)?.provider;
+  const accessToken = (session as any)?.accessToken;
+  if (!provider || !accessToken) return;
+
+  // register/refresh this participant so cron can sync them later
+  (async () => {
+    try {
+      const res = await fetch('/api/participants/upsert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',                // IMPORTANT: send session cookie
+        body: JSON.stringify({ id: idStr, optIn: true }),
+      });
+      const j = await res.json();
+      console.log('participants/upsert ->', res.status, j);
+    } catch (e) {
+      console.warn('participants/upsert failed', e);
+    }
+  })();
+}, [idStr, session]);
+
+
 useTouchMeta(idStr, 'active');
 
 useEffect(() => {
