@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import {fetchGoogleBusy} from '@/calendar/fetchGoogleBusy';
+import { useBusySegments } from '@/utils/busySync';
 import { DateTime } from 'luxon';
 import {
   getDateRange,
@@ -35,7 +35,6 @@ export default function RSVPFillPage() {
   const [range, setRange] = useState<{ from: string; to: string } | null>(null);
   const [extendedHours, setExtendedHours] = useState(false);
   const [slotDuration, setSlotDuration] = useState<string>('60');
-  const [busySlots, setBusySlots] = useState<TimeSlot[]>([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [customMode, setCustomMode] = useState(false);
@@ -48,6 +47,14 @@ const canSubmit = useMemo(
   () => Boolean(name.trim() && email.trim()),
   [name, email]
 );
+
+const { busySegments } = useBusySegments({
+  range,
+  session,
+  customMode,        // still fetch in custom (visuals only)
+  fetchInCustom: true,
+});
+
   useTouchMeta(idStr, 'active');  
 
 
@@ -71,8 +78,11 @@ const canSubmit = useMemo(
 
   useEffect(() => {
   // Only run after the user is authenticated, only once per mount
-  if (!session || calledUpsert.current === true) return;
+   if (!session || calledUpsert.current) return;
 
+ const provider = (session as any)?.provider;
+ const accessToken = (session as any)?.accessToken;
+ if (!provider || !accessToken) return;
   calledUpsert.current = true;
 
   // Auto opt-in; later you can gate this behind a checkbox
@@ -84,29 +94,6 @@ const canSubmit = useMemo(
   }).catch(() => { /* ignore in UI */ });
 }, [session, params?.id]);
 
-
-useEffect(() => {
-  if (!range) return;
-
-  // Note: you already expose session.accessToken & session.provider — we keep using that.
-  const provider = (session as any)?.provider;
-
-  (async () => {
-    if (provider === 'google') {
-      const token = (session as any)?.accessToken;
-      if (typeof token !== 'string') return;
-      const slots = await fetchGoogleBusy(range.from, range.to, token);
-      setBusySlots(slots);
-    } else if (provider === 'azure-ad') {
-      // Outlook branch now goes through server API (auto refresh + no cache)
-      const slots = await loadOutlookBusy(range.from, range.to);
-      setBusySlots(slots);
-    } else {
-      // not logged in / manual mode — leave busySlots empty
-      setBusySlots([]);
-    }
-  })();
-}, [range, session]);
 
 
 
@@ -137,7 +124,7 @@ function dayAvailabilityLabel(dateISO: string): 'All Day' | '~All Day' | null {
   const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
 
   // Convert busy events into the same zone to avoid TZ drift
-  const overlapping = busySlots
+  const overlapping = busySegments
     .map(({ start, end }) => {
       const bs = DateTime.fromISO(start, { zone: 'Europe/Amsterdam' });
       const be = DateTime.fromISO(end, { zone: 'Europe/Amsterdam' });
@@ -157,20 +144,6 @@ function dayAvailabilityLabel(dateISO: string): 'All Day' | '~All Day' | null {
   return null;
 }
 
-// -- NEW: always fetch Outlook busy server-side (auto-refresh + no-cache)
-async function loadOutlookBusy(from: string, to: string) {
-  const res = await fetch(`/api/busy/outlook?from=${from}&to=${to}`, {
-    cache: 'no-store',
-    credentials: 'include', // send your session cookie/JWT
-    headers: { 'x-prikkr': 'refresh' }, // harmless cache-buster header
-  });
-  if (!res.ok) {
-    console.error('Failed to load Outlook busy:', await res.text());
-    return [];
-  }
-  const { busy } = await res.json();
-  return busy as TimeSlot[];
-}
 
 
 
@@ -208,7 +181,7 @@ const buildPayload = async () => {
         if (label) available.push(label);             // 'All Day' or '~All Day'
       } else {
         for (const time of fullSlots) {
-          const segs = getSlotBusySegments(time, date, busySlots, durationMinutes);
+          const segs = getSlotBusySegments(time, date, busySegments, durationMinutes);
           const isFree = !segs.some(s => s.color === '#ef4444');
           if (isFree) available.push(time);
         }
@@ -240,6 +213,7 @@ const buildPayload = async () => {
     email: cleanEmail,
     selections,
     isCreator: false,
+    mode: customMode ? 'custom' : 'sync',
   };
 };
 
@@ -325,7 +299,7 @@ return (
           const isDayBusy = (date: string) => {
             const dayStart = DateTime.fromISO(date + 'T00:00:00', { zone: 'Europe/Amsterdam' });
             const dayEnd = dayStart.plus({ days: 1 });
-            return busySlots.some(({ start, end }) => {
+            return busySegments.some(({ start, end }) => {
               const busyStart = DateTime.fromISO(start);
               const busyEnd = DateTime.fromISO(end);
               return busyStart < dayEnd && busyEnd > dayStart;
@@ -377,7 +351,7 @@ const grouped =
                       const dayEnd = dayStart.plus({ days: 1 });
                       const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
 
-                      const overlappingBusy = busySlots
+                      const overlappingBusy = busySegments
                         .map(({ start, end }) => {
                           const busyStart = DateTime.fromISO(start);
                           const busyEnd = DateTime.fromISO(end);
@@ -466,7 +440,7 @@ const isMostlyFree = label === '~All Day';
                 const segments = getSlotBusySegments(
                   time,
                   date,
-                  busySlots,
+                  busySegments,
                   durationMinutes
                 ) as BusySegment[];
 
