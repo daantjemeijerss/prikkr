@@ -4,6 +4,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { signIn, useSession } from 'next-auth/react';
 import { useTouchMeta } from '@/hooks/useTouchMeta';  
+import AppleSyncNotice from '@/calendar/AppleSyncNotice';
 
 export default function RSVPLoginPage() {
   const { data: session, status } = useSession();
@@ -102,6 +103,10 @@ export default function RSVPLoginPage() {
             Don't sync with calendar
           </button>
         </div>
+
+        {/* Apple users help link */}
+        <AppleSyncNotice className="mt-2" />
+
 
         {showManual && (
           <div className="w-full max-w-md flex flex-col items-center">

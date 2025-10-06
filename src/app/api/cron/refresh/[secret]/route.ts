@@ -5,6 +5,15 @@ import { fetchGoogleBusy, refreshGoogleTokenIfNeeded } from '@/calendar/fetchGoo
 import { fetchOutlookBusy, refreshOutlookTokenIfNeeded } from '@/calendar/fetchOutlookBusy';
 import { getKV, setKV } from '@/lib/kv'; // or remove if not using KV
 
+type Mode = 'custom' | 'sync';
+
+type StoredResponse = {
+  name: string;
+  email?: string;
+  selections: Record<string, string[]>;
+  mode: Mode;
+  updatedAt: string;
+};
 
 type Ctx = { params: Promise<{ secret: string }> }; // Next 15 requires awaiting
 
@@ -36,16 +45,26 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   }
 
   const slotMin = durationInMinutes(meta.slotDuration ?? 60);
-  const existing = await getResponses(id);
 
-  const byKey = new Map<string, typeof existing[number]>();
-  for (let i = 0; i < existing.length; i++) {
-    const r = existing[i];
-    const email = (r as any).email ? String((r as any).email).toLowerCase() : '';
-    const name  = r.name ? r.name.toLowerCase() : '';
-    const k = email || (name ? `${name}#${i}` : `anon#${i}`);
-    byKey.set(k, r);
-  }
+  const rawExisting = await getResponses(id);
+
+// Backfill legacy rows without mode/updatedAt
+const existing: StoredResponse[] = (Array.isArray(rawExisting) ? rawExisting : []).map((r: any, i: number) => ({
+  name: r.name ?? (r.email ?? `Participant#${i}`),
+  email: r.email,
+  selections: r.selections ?? {},
+  mode: r.mode === 'custom' ? 'custom' : 'sync',
+  updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : new Date(0).toISOString(),
+}));
+
+const byKey = new Map<string, StoredResponse>();
+for (let i = 0; i < existing.length; i++) {
+  const r = existing[i];
+  const email = r.email ? String(r.email).toLowerCase() : '';
+  const name  = r.name ? r.name.toLowerCase() : '';
+  const k = email || (name ? `${name}#${i}` : `anon#${i}`);
+  byKey.set(k, r);
+}
 
   let updated = 0;
   const debugLog: any[] = [];
@@ -63,6 +82,15 @@ for (let idx = 0; idx < participantsArr.length; idx++) {
     if (debug) debugLog.push({ skip: p.email || p.name, reason: 'opt-out' });
     continue;
   }
+
+  // ---- NEW: do not recompute for manual users ----
+  const emailKey = (p.email || '').toLowerCase();
+  const prevRec = emailKey ? byKey.get(emailKey) : undefined;
+  if (prevRec?.mode === 'custom') {
+    if (debug) debugLog.push({ skip: emailKey || p.name, reason: 'manual-mode' });
+    continue;
+  }
+  
 
   // --- NEW: stale-only guard ---
   const lastAt = p.lastBusySyncAt ? Date.parse(p.lastBusySyncAt) : 0;
@@ -103,21 +131,29 @@ for (let idx = 0; idx < participantsArr.length; idx++) {
     'Europe/Amsterdam'
   );
 
-  // upsert into byKey (your existing logic)
-  const emailKey = (p.email || '').toLowerCase();
+  // upsert into byKey (typed + mark as sync)
   if (emailKey) {
-    byKey.set(emailKey, {
-      name: p.name || p.email || 'Participant',
+    const prev = byKey.get(emailKey);
+    const next: StoredResponse = {
+      name: (p.name || prev?.name || p.email || 'Participant'),
       email: p.email,
       selections,
-    });
+      mode: 'sync',                          // recomputed from provider
+      updatedAt: new Date().toISOString(),
+    };
+    byKey.set(emailKey, next);
   } else {
     const fallbackKey = (p.name || 'participant').toLowerCase() + '#auto';
-    byKey.set(fallbackKey, {
-      name: p.name || 'Participant',
+    const prev = byKey.get(fallbackKey);
+    const next: StoredResponse = {
+      name: (p.name || prev?.name || 'Participant'),
       selections,
-    } as any);
+      mode: 'sync',
+      updatedAt: new Date().toISOString(),
+    } as StoredResponse;
+    byKey.set(fallbackKey, next);
   }
+
 
   updated++;
   if (debug) debugLog.push({ who: p.email || p.name, provider: p.provider, busyCount: busy.length });

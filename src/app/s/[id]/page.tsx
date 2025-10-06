@@ -3,8 +3,8 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useMemo } from 'react';
-import {fetchGoogleBusy} from '@/calendar/fetchGoogleBusy';
 import { DateTime } from 'luxon';
+import { useBusySegments } from '@/utils/busySync';
 import {
   getDateRange,
   getWeekday,
@@ -33,16 +33,46 @@ export default function PrikkrPage() {
   const idStr = typeof params?.id === 'string' ? params.id : undefined;
   const router = useRouter();
   const { data: session } = useSession();
-  const [busySlots, setBusySlots] = useState<TimeSlot[]>([]);
   const [range, setRange] = useState<{ from: string; to: string } | null>(null);
   const [extendedHours, setExtendedHours] = useState(false);
-  const [slotDuration, setSlotDuration] = useState<string>('hourly');
+  const [slotDuration, setSlotDuration] = useState<string>('60'); // meta will overwrite
   const [customMode, setCustomMode] = useState(false);
   const [manualSelections, setManualSelections] = useState<Record<string, Set<string>>>({});
 
   // new state to hold fallbacks when not logged in
 const [fallbackEmail, setFallbackEmail] = useState<string | null>(null);
 const [fallbackName, setFallbackName] = useState<string | null>(null);
+const { busySegments } = useBusySegments({
+  customMode,
+  range,
+  session,
+});
+
+useEffect(() => {
+  if (!idStr) return;
+
+  // require a logged-in provider so the route can read tokens from the session cookie
+  const provider = (session as any)?.provider;
+  const accessToken = (session as any)?.accessToken;
+  if (!provider || !accessToken) return;
+
+  // register/refresh this participant so cron can sync them later
+  (async () => {
+    try {
+      const res = await fetch('/api/participants/upsert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',                // IMPORTANT: send session cookie
+        body: JSON.stringify({ id: idStr, optIn: true }),
+      });
+      const j = await res.json();
+      console.log('participants/upsert ->', res.status, j);
+    } catch (e) {
+      console.warn('participants/upsert failed', e);
+    }
+  })();
+}, [idStr, session]);
+
 
 useTouchMeta(idStr, 'active');
 
@@ -90,28 +120,6 @@ async function loadOutlookBusy(from: string, to: string) {
   const { busy } = await res.json();
   return busy as TimeSlot[];
 }
-
-useEffect(() => {
-  if (!range) return;
-
-  const provider = (session as any)?.provider;
-  const accessToken = (session as any)?.accessToken;
-
-  (async () => {
-    if (provider === 'google') {
-      if (typeof accessToken !== 'string') return;
-      const busy = await fetchGoogleBusy(range.from, range.to, accessToken);
-      setBusySlots(busy);
-    } else if (provider === 'azure-ad') {
-      // Outlook via server route (auto token refresh + no-store)
-      const busy = await loadOutlookBusy(range.from, range.to);
-      setBusySlots(busy);
-    } else {
-      // not logged in / manual
-      setBusySlots([]);
-    }
-  })();
-}, [range, session]);
 
 
   const generateSlots = () => {
@@ -187,7 +195,7 @@ const buildPayload = () => {
   const dayEnd   = dayStart.plus({ days: 1 });
   const totalMin = dayEnd.diff(dayStart, 'minutes').minutes;
 
-  const busyMin = busySlots
+  const busyMin = busySegments
     .map(({ start, end }) => {
       const bStart = DateTime.fromISO(start);
       const bEnd   = DateTime.fromISO(end);
@@ -203,7 +211,7 @@ const buildPayload = () => {
   else if (freeRatio >= 0.8) availableSlots.push('All Day'); // treat "~All Day" as "All Day" in payload
 }
 else {
-          const busy = isSlotBusy(time, date, busySlots, durationMinutes);
+          const busy = isSlotBusy(time, date, busySegments, durationMinutes);
           if (!busy) availableSlots.push(time);
         }
       }
@@ -217,7 +225,7 @@ else {
     console.error('Payload missing fields', { id, name, email, serialized });
   }
 
-  return { id, name, email, selections: serialized, isCreator: true };
+  return { id, name, email, selections: serialized, isCreator: true, mode: customMode ? 'custom' : 'sync', };
 };
 
 
@@ -299,7 +307,7 @@ else {
                   const dayEnd = dayStart.plus({ days: 1 });
                   const totalMinutes = dayEnd.diff(dayStart, 'minutes').minutes;
 
-                  const overlappingBusy = busySlots
+                  const overlappingBusy = busySegments
                     .map(({ start, end }) => {
                       const busyStart = DateTime.fromISO(start);
                       const busyEnd = DateTime.fromISO(end);
@@ -383,11 +391,11 @@ else {
     const endTime = end.toTimeString().slice(0, 5);
 
     const segments = getSlotBusySegments(
-      time,
-      date,
-      busySlots,
-      durationMinutes
-    ) as BusySegment[];
+  time,
+  date,
+  busySegments,
+  durationMinutes
+);
 
     return (
       <TimeSlotButton
