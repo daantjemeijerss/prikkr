@@ -2,6 +2,8 @@
 
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import AppleSyncNotice from '@/calendar/AppleSyncNotice';
+
 
 export default function Home() {
   const { data: session, status } = useSession()
@@ -80,6 +82,10 @@ export default function Home() {
 </div>
 
         )}
+
+        {/* Apple users help link */}
+<AppleSyncNotice className="mt-2" />
+
       </section>
 
       {/* How it works section */}

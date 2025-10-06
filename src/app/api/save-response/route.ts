@@ -4,7 +4,16 @@ import { kv } from '@vercel/kv';
 
 export const runtime = 'nodejs'; // avoid Edge quirks with fetch/KV
 
-type StoredResponse = { name: string; email: string; selections: any };
+type Mode = 'custom' | 'sync';
+
+type StoredResponse = {
+  name: string;
+  email: string;
+  selections: Record<string, string[]>;
+  mode: Mode;          // new
+  updatedAt: string;   // new
+};
+
 
 function normalizeSelections(input: any): Record<string, string[]> {
   const out: Record<string, string[]> = {};
@@ -37,6 +46,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { id, name, email } = body as { id?: string; name?: string; email?: string };
     const selections = normalizeSelections((body as any).selections);
+    const incomingMode: Mode = body.mode === 'custom' ? 'custom' : 'sync';
+    const now = new Date().toISOString();
+
 
     console.log('📥 Saving response:', { id, name, email, selections });
 
@@ -63,16 +75,47 @@ export async function POST(req: NextRequest) {
       existingData = stored as StoredResponse[];
     }
 
-    const idx = existingData.findIndex(entry => entry.email?.toLowerCase() === email.toLowerCase());
-    const next: StoredResponse = { name, email, selections };
+    // Backfill defaults for legacy rows (no mode/updatedAt)
+existingData = (existingData as any[]).map((r) => ({
+  name: r.name,
+  email: r.email,
+  selections: r.selections ?? {},
+  mode: (r.mode === 'custom' ? 'custom' : 'sync') as Mode,
+  updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : new Date(0).toISOString(),
+})) as StoredResponse[];
 
-    if (idx !== -1) {
-      existingData[idx] = next;
-      console.log(`🔁 Updated response for ${email}`);
-    } else {
-      existingData.push(next);
-      console.log(`✅ New response saved for ${email}`);
-    }
+
+const normEmail = email.toLowerCase();
+const idx = existingData.findIndex(entry => entry.email?.toLowerCase() === normEmail);
+
+if (idx >= 0) {
+  const prev = existingData[idx];
+
+  // If they were manual, keep them manual unless the incoming explicitly says 'sync'
+  const nextMode: Mode =
+    prev.mode === 'custom' && incomingMode !== 'sync'
+      ? 'custom'
+      : incomingMode;
+
+  existingData[idx] = {
+    ...prev,
+    name: name ?? prev.name,
+    email: prev.email,        // keep canonical stored email
+    selections,               // always trust the latest client payload
+    mode: nextMode,
+    updatedAt: now,
+  };
+  console.log(`🔁 Updated response for ${email} (mode=${nextMode})`);
+} else {
+  existingData.push({
+    name: name ?? email,
+    email,
+    selections,
+    mode: incomingMode,
+    updatedAt: now,
+  });
+  console.log(`✅ New response saved for ${email} (mode=${incomingMode})`);
+}
 
     // Persist (store as array; matches your current pattern)
     await kv.set(redisKey, existingData);
